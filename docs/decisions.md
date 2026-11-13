@@ -78,3 +78,15 @@ Records are history: an older record is not edited when a newer one changes it. 
   next game, a browser without WebHID). *Why:* releases from `main` to `production` can then be automated with
   confidence; what only the real pedal shows (USB in the kiosk, footswitch timing) stays a manual check per release
   of the protocol use.
+- **E-013 · 2026-11-13 · Klaus (what), Claude (how)** — Supported firmware: V2.1.2 and newer. The version number
+  cannot be read over the editor's HID connection (Mooer's editor asks for it only in its update protocol, USB bulk
+  transfers the game must not send), so the board checks the answers to the connect sequence against those of V2.1.2
+  (every answer, exact sizes, 8 s; V2.1.4 has the same command set). Until a pedal passes, the board reports nothing
+  about it and writes nothing to it; a pedal that answers differently is shown as not supported and stays untouched.
+  The board says what is wrong in a notice in the editor's place: no WebHID, no pedal, none chosen, in use by another
+  program, disconnected, unsupported. It connects by itself when the pedal is plugged in (the browser's `connect`
+  event for a pedal it may use). *Why:* a firmware with another protocol could misread what the game sends; the game
+  only works where its behaviour is tested.
+- **E-014 · 2026-11-13 · Claude** — Tables are Debian 13 PCs running Google Chrome in a kiosk (as user `table` in a
+  login session) with an HP E24t G5 1920 × 1080 multitouch screen. The README's udev rule (`uaccess`) and Chrome policy
+  are written for that; the browser checks run in Google Chrome; the faders follow each finger separately.

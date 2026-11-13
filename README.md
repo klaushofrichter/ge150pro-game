@@ -41,7 +41,15 @@ Rules for players: [`games/ge150-pro/how-to-play.md`](games/ge150-pro/how-to-pla
 The pedal must be connected to the **table's computer** by USB (the board's browser drives it over WebHID). Only one
 program can use the pedal at a time: close Mooer's own editor on that computer.
 
-- **Linux tables:** the kiosk's browser needs permission to open the pedal's HID device. Once, as root:
+- **Firmware:** the game supports GE150 Pro firmware **V2.1.2 and newer**. The version number cannot be read over the
+  pedal's editor connection, so the board checks the pedal's answers at connect against those of the supported
+  firmware; a pedal that answers differently is shown as not supported and nothing is written to it
+  ([E-013](docs/decisions.md)). Update older pedals with Mooer's editor.
+- **Without a pedal** the game still starts: the board says how to connect it and connects by itself when the pedal is
+  plugged in (also after it was unplugged during a game); the phone's table click works meanwhile.
+
+- **Linux tables (Debian 13):** the kiosk runs Google Chrome as the user `table` in a login session (games-service
+  `deploy/table-pc`). Chrome needs permission to open the pedal's HID device. Once, as root:
 
   ```sh
   echo 'SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5703", MODE="0660", TAG+="uaccess"' \
@@ -49,8 +57,8 @@ program can use the pedal at a time: close Mooer's own editor on that computer.
   udevadm control --reload && udevadm trigger
   ```
 
-  `uaccess` gives the logged-in kiosk user access; use `GROUP="<the kiosk user's group>"` instead if the kiosk does
-  not run in a login session. Unplug and plug the pedal afterwards.
+  `uaccess` gives the logged-in kiosk user (`table`, a login session through `PAMName=login`) access. Unplug and plug
+  the pedal afterwards.
 - **No prompt (optional):** the kiosk runs Chrome in incognito mode, so it forgets which USB devices the board may
   use, and **Connect pedal** opens the device chooser each session. A Chrome policy allows the pedal for the board
   for good (the table host's port, 8080 by default):
@@ -64,7 +72,8 @@ program can use the pedal at a time: close Mooer's own editor on that computer.
 - **Windows and macOS tables:** Chrome and Edge support WebHID without extra setup; the policy above applies the same
   way.
 
-A remote player's board shows what happens but never controls the pedal.
+A remote player's board shows what happens but never controls the pedal. The board is made for a 1920 × 1080
+multitouch screen (tables use an HP E24t G5): faders follow each finger on its own, so two can move at once.
 
 ## How it works
 

@@ -74,6 +74,13 @@
 .gp-f-step .gp-btn { min-width: 54px; padding: 0; font-size: 26px; }
 .gp-empty { padding: 30px 6px; font-size: 22px; }
 
+/* The notice panel in the editor's place while the pedal is not ready (none, busy, disconnected, unsupported). */
+.gp-notice { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 18px;
+  padding: 0 40px; max-width: 900px; }
+.gp-notice-title { font-family: var(--display); font-weight: 600; font-size: 44px; }
+.gp-notice-text { font-size: 24px; line-height: 1.4; color: var(--ink-soft); }
+.gp-locked .gp-tile, .gp-locked .gp-abcd, .gp-locked .gp-bank, .gp-locked .gp-model, .gp-locked .gp-ed-power { opacity: 0.4; }
+
 /* Side panel: Presets and Configurations. */
 .gp-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
 .gp-tab { min-height: 60px; border-radius: 999px; font-size: 21px; font-weight: 600; color: var(--ink);

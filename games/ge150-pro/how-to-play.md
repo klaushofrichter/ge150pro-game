@@ -19,6 +19,10 @@ Connect the GE150 Pro to the table's computer with a USB cable before starting. 
 when it can; otherwise tap **Connect pedal** on the board and choose **GE150Pro**. Only one program can use the pedal at
 a time: close Mooer's own editor first. The pedal's presets load in a few seconds.
 
+Without a pedal the board says how to connect it, and connects by itself as soon as the pedal is plugged in (also when
+it was unplugged during the game). The game needs the pedal's firmware **V2.1.2 or newer**; with an older firmware the
+board says so and changes nothing on the pedal: update it with Mooer's editor.
+
 ## The board
 
 - **The signal chain** across the top shows the nine modules in the pedal's order. **ON/OFF** switches a module; tap

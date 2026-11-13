@@ -8,3 +8,4 @@ export { PRESET_COUNT, SLOT_COUNT, presetLabel, type ModuleState, type Preset, t
 export { RHYTHM_MODES, RHYTHM_STYLES, METRONOME_STYLES, styleName, type Rhythm } from './rhythm.ts';
 export { EXP_MODULES, EXP_PARAMS, expLabel } from './exp.ts';
 export { LEVEL_LABELS } from './system.ts';
+export { ConnectCheck, MIN_FIRMWARE, type CompatResult } from './compat.ts';
