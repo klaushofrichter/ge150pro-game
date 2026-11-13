@@ -1,4 +1,4 @@
-// Framing for the GE150 Pro editor channel. See docs/protocol/README.md.
+// Framing for the GE150 Pro's control channel. See docs/protocol.md.
 
 export const REPORT_SIZE = 64;
 const CHUNK = REPORT_SIZE - 1;

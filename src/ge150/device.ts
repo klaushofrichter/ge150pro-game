@@ -1,4 +1,4 @@
-// WebHID connection to the GE150 Pro editor interface.
+// WebHID connection to the GE150 Pro's control channel.
 import { encodeMessage, Reassembler, toReports, type Message } from './frame.ts';
 import { Cmd, handshake, isModuleReport, renamePreset, requestCurrent, selectPreset, setModule, storePreset } from './commands.ts';
 import { decodeModule, decodePreset, PRESET_COUNT, type ExpSettings, type ModuleState, type Preset } from './preset.ts';

@@ -1,4 +1,4 @@
-// Conversion between device presets and the official editor's .mo (JSON) files.
+// Conversion between device presets and .mo preset files (JSON).
 import { model } from './catalog.ts';
 import { EXP_ORDER, SLOT_COUNT, type ExpSettings, type ModuleState, type Preset } from './preset.ts';
 

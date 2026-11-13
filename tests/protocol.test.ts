@@ -15,7 +15,7 @@ import {
 const hex = (s: string) => Uint8Array.from(s.replace(/\s+/g, '').match(/../g)!.map((b) => parseInt(b, 16)));
 const toHex = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
 
-// Byte streams observed from the official editor (captures/raw/session1.log, 2026-11-13).
+// Byte streams as the pedal's editor sends them (recorded 2026-11-13).
 const OBSERVED = {
   select1B: 'aa5502009602 8098',
   select2A: 'aa5502009605 f07f',
@@ -65,7 +65,7 @@ describe('frame', () => {
 });
 
 describe('system settings', () => {
-  // Payloads observed in captures/raw/session2.log (2026-11-13).
+  // Payloads as recorded on 2026-11-13.
   const payload = (m: Uint8Array) => toHex(m.subarray(5, m.length - 2));
 
   it('decodes the connect-time system, global EQ and spill-over reports', () => {
@@ -136,7 +136,7 @@ describe('preset', () => {
 });
 
 describe('rhythm', () => {
-  // 0C payloads observed in captures/raw/session4.log while the user changed the pedal's RHYTHM menu.
+  // 0C payloads recorded while the pedal's RHYTHM menu was changed.
   it('decodes the drum machine report', () => {
     expect(decodeRhythm(hex('010000057800'))).toEqual({ playing: true, mode: 0, style: 0, volume: 5, bpm: 120 });
     expect(decodeRhythm(hex('010003087b00'))).toEqual({ playing: true, mode: 0, style: 3, volume: 8, bpm: 123 });
@@ -156,7 +156,7 @@ describe('rhythm', () => {
 });
 
 describe('expression pedal', () => {
-  // captures/raw/session5.log (2026-11-13): connect reports and the editor's EXP panel.
+  // Connect reports and EXP settings as recorded on 2026-11-13.
   const exp = { MODULE_CTRL: 2, PARA_CTRL: 13, FUN_SWITCH: 1, VOL_SWITCH: 0, VOL_MIN: 0, VOL_MAX: 100 };
 
   it('decodes the connect-time reports', () => {
@@ -198,7 +198,7 @@ describe('parameter value encoding', () => {
 describe('parameter positions', () => {
   const model = (slot: number, name: string) => catalog.slots[slot].models.find((m) => m.name === name)!;
 
-  it('places values where the pedal reads them (webcam 2026-11-13, dumps vs .mo)', () => {
+  it('places values where the pedal reads them', () => {
     const pos = (slot: number, name: string) => Object.fromEntries(model(slot, name).params.map((p) => [p.name, p.pos]));
     expect(pos(6, 'PHASER')).toEqual({ RATE: 0, LEVEL: 1, DEPTH: 3 });
     expect(pos(6, 'PITCH SHIFT')).toEqual({ PITCH: 5, MIX: 1, TONE: 2 });

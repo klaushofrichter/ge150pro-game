@@ -1,4 +1,4 @@
-// Expression pedal assignment, per preset. See docs/protocol/README.md -> Expression pedal.
+// Expression pedal assignment, per preset. See docs/protocol.md.
 import { encodeMessage } from './frame.ts';
 import type { ExpSettings } from './preset.ts';
 
@@ -14,13 +14,12 @@ export const ExpCmd = {
 /** Volume range of EXP VOL. *Inferred* from the connect value (max 100). */
 export const EXP_VOL_MAX = 100;
 
-/** Modules in chain order, as labelled in the editor's EXP panel. */
+/** Modules in chain order, with the short names the pedal's EXP menu uses. */
 export const EXP_MODULES = ['FX', 'DS', 'AMP', 'CAB', 'NS', 'EQ', 'MOD', 'DLY', 'REV'] as const;
 
 /**
  * Controllable parameters per module with their PARA_CTRL ids, in panel order.
- * From Exp::dataInit in the official editor (names and ids are literal there), confirmed by
- * the first id of every module in captures/raw/session5.log.
+ * Each id selects the same parameter name in every model of its module.
  */
 export const EXP_PARAMS: { name: string; id: number }[][] = [
   [['POSITION', 0], ['Q', 1], ['RATE', 2], ['ATTACK', 3], ['RANGE', 4], ['SENS', 5], ['THRES', 6], ['PEAK', 7], ['RATIO', 8], ['LEVEL', 9], ['DEPTH', 100]],
