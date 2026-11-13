@@ -99,4 +99,5 @@ Records are history: an older record is not edited when a newer one changes it. 
   longer generated; `scripts/import-protocol.mjs` removed), and code comments, tests, the catalog's `source` field and
   the decision records no longer name the vendor software's internals, analysis tools, recordings or how the research
   was done. Wording in E-005, E-009, E-010 and E-013 was shortened for this; their decisions are unchanged. *Why:* the
-  research is not needed to run the game and stays in the private GE150PRO repository.
+  research is not needed to run the game and stays in the private GE150PRO repository. The commit history is not
+  rewritten: earlier wording stays in it (Klaus accepts that).
