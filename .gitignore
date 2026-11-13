@@ -1,0 +1,14 @@
+# dependencies and the games-service checkout the tests run against
+node_modules/
+.games-service
+# browser check: outputs and the local Python environment
+e2e-out/
+.venv/
+__pycache__/
+out/
+# secrets and editor swap files: never committed
+.env
+.env.*
+*.swp
+*.swo
+.DS_Store

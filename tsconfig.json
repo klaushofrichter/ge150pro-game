@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "rootDir": ".",
+    "types": ["node", "w3c-web-hid"],
+    // Games import the SDK by name; the table host maps it to its own copy at run time (games-service D-097).
+    "paths": {
+      "@game-table/sdk": ["./.games-service/packages/sdk/src/index.ts"],
+      "@game-table/sdk/cards": ["./.games-service/packages/sdk/src/cards.ts"]
+    }
+  },
+  // noEmit over the game's rules, the protocol library, tests and scripts: vitest strips types, so nothing else checks them.
+  "include": ["games/*/*.ts", "src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts", "vitest.config.ts"]
+}

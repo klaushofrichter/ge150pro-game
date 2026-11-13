@@ -1,0 +1,110 @@
+# PR checks: test, e2e, codeql (the cluster repository's baseline), as in synth-game.
+# Tables get the game from the `production` branch (the console lists klaushofrichter/ge150pro-game@production), so
+# that is the branch to protect with these contexts. Triggers on PRs to main too, so Dependabot's PRs are checked.
+# Weekly, the same checks run against games-service `main` instead of the pinned ref in games-service.ref: a platform
+# change that would break the game shows up here before it reaches a table.
+# Every job's runs-on follows the repository variable CI_RUNNER: "self" = our own runners (private repositories,
+# Game Table CI notes), unset or "hosted" = GitHub's.
+name: PR checks
+on:
+  pull_request:
+    branches: [main, production]
+  schedule:
+    - cron: "23 11 * * 1" # Mondays, after Dependabot's 06:00 America/Chicago run
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GAMES_SERVICE_REF: ${{ github.event_name == 'schedule' && 'main' || '' }}
+
+jobs:
+  test:
+    runs-on: ${{ vars.CI_RUNNER == 'self' && fromJSON('["self-hosted","ci-private"]') || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the game-version check compares with the branch the PR goes into
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      # games-service (public): the runtime, host and SDK the game is tested against.
+      - run: scripts/games-service.sh
+      # A game's version changes exactly when its folder does (games-service D-127).
+      - name: Game versions
+        if: github.event_name == 'pull_request'
+        run: node .games-service/scripts/check-game-versions.ts --base "origin/${{ github.base_ref }}"
+      # Rules, protocol library, bundle, rules for players, and that the committed assets/ge150.js is current.
+      - run: npm test
+      # noEmit over the game, the library, tests and scripts: vitest strips types, so nothing else checks them.
+      - run: npm run typecheck
+      # `high`, so a moderate advisory whose only fix is a major upgrade cannot wedge unrelated merges.
+      - run: npm audit --audit-level=high
+
+  e2e:
+    runs-on: ${{ vars.CI_RUNNER == 'self' && fromJSON('["self-hosted","ci-private"]') || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: npm ci
+      - run: scripts/games-service.sh
+      - run: pip install -r scripts/e2e/requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      # A simulated pedal (scripts/e2e/fake_pedal.js) stands in for the GE150 Pro: CI has no hardware.
+      - run: scripts/e2e/run-all.sh e2e-out
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-screenshots
+          path: e2e-out
+          retention-days: 14
+
+  codeql-scan:
+    runs-on: ${{ vars.CI_RUNNER == 'self' && fromJSON('["self-hosted","ci-private"]') || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      security-events: write
+      actions: read # codeql-action reads the run's own metadata; without it: "Resource not accessible by integration"
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python, actions]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7 # CodeQL needs a Node on PATH (Game Table CI notes, 2026-10-21)
+        with:
+          node-version: 26
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          config-file: .github/codeql/codeql-config.yml
+      # Private repositories cannot upload results (no Advanced Security): the gate below reads the SARIF instead.
+      - uses: github/codeql-action/analyze@v4
+        with:
+          upload: never
+          output: sarif-results
+      # The analyze action never fails the job on findings; this does. Accepted ones: .github/codeql-accepted.tsv.
+      - run: .github/scripts/codeql-gate.sh sarif-results
+
+  # One context named `codeql` for the whole matrix, which is what branch protection requires.
+  codeql:
+    if: always()
+    needs: codeql-scan
+    runs-on: ${{ vars.CI_RUNNER == 'self' && fromJSON('["self-hosted","ci-private"]') || 'ubuntu-latest' }}
+    steps:
+      - env:
+          RESULT: ${{ needs.codeql-scan.result }}
+        run: '[ "$RESULT" = "success" ] || { echo "::error::CodeQL: $RESULT"; exit 1; }'

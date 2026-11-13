@@ -1,0 +1,42 @@
+{
+  "id": "ge150-pro",
+  "name": "GE150 Pro",
+  "version": "2026.11.13.1",
+  "sdk": "^0.1",
+  "description": "Control a Mooer GE150 Pro connected to the table: shape its signal chain on the board, recall your sounds and run a click from your phone while you play.",
+  "players": {
+    "min": 1,
+    "max": 1
+  },
+  "turnModel": "simultaneous",
+  "seatLayouts": [
+    1
+  ],
+  "edges": [
+    "north",
+    "south"
+  ],
+  "localSeat": "south",
+  "dynamicPlayers": false,
+  "settings": [],
+  "ai": {
+    "supported": false,
+    "options": []
+  },
+  "simulation": {
+    "supported": false,
+    "headless": true
+  },
+  "remoteBoardControl": false,
+  "boardIntents": [
+    "pedal",
+    "done",
+    "switched",
+    "capture",
+    "edit",
+    "apply",
+    "select",
+    "click"
+  ],
+  "lobbyButton": "bottom-right"
+}

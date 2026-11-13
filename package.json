@@ -1,0 +1,23 @@
+{
+  "name": "ge150pro-game",
+  "license": "MIT",
+  "private": true,
+  "description": "Remote control for a Mooer GE150 Pro as a game for Game Table (games/ge150-pro), tested against games-service",
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "setup": "scripts/games-service.sh",
+    "build:assets": "node scripts/build-assets.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/w3c-web-hid": "^1.0.7",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

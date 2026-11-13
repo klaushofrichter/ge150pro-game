@@ -1,0 +1,8 @@
+# CodeQL scans this repository's own code: the game, the protocol library, tests, scripts and workflows.
+name: ge150pro-game
+paths:
+  - games
+  - src
+  - scripts
+  - tests
+  - .github
