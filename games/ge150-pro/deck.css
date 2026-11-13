@@ -45,6 +45,7 @@
 .gd-follow[aria-pressed="true"] { background: rgba(214, 169, 74, 0.18); border-color: var(--brass); }
 
 .gd-status-text { font-size: 1.05em; margin-top: 2px; }
+.gd-req { font-size: 0.8em; margin-top: 6px; }
 .gd-list { display: flex; flex-direction: column; gap: 6px; }
 .gd-config { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 12px;
   background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1); }

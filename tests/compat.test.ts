@@ -59,3 +59,17 @@ describe("the connect check", () => {
     expect(r.missing).not.toContain("system settings");
   });
 });
+
+describe("the stated requirement (E-015)", () => {
+  const read = (f: string) => readFileSync(`${ROOT}/games/ge150-pro/${f}`, "utf8");
+  const needs = `${MIN_FIRMWARE} or newer`;
+
+  it("every place that names the required firmware names the library's minimum", () => {
+    const manifest = JSON.parse(read("manifest.json"));
+    expect(manifest.description).toContain("GE150 Pro");
+    expect(manifest.description).toContain(`firmware ${needs}`);
+    expect(read("how-to-play.md")).toContain(needs);
+    expect(read("deck.js")).toContain(needs);
+    expect(read("board.js")).toContain(`const MIN_FIRMWARE = "${MIN_FIRMWARE}";`);
+  });
+});

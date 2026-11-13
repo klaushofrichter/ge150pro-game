@@ -68,6 +68,7 @@ def main():
             wait(lambda: board.locator(".gp-dot[data-state=on]").count(), 20, "the board to connect to the pedal")
             wait(lambda: "Preset 5" in board.locator(".gp-name").inner_text(), 10, "the board to show the current preset")
             assert board.locator(".gp-label").inner_text() == "2A", board.locator(".gp-label").inner_text()
+            assert board.locator(".gp-notice").is_hidden(), "no notice once the pedal is connected and supported"
             if deck.locator("#tab-game").count():
                 deck.locator("#tab-game").click()
             wait(lambda: "Preset 5" in deck.locator(".gd-name").inner_text(), 10, "the phone to show the current preset")

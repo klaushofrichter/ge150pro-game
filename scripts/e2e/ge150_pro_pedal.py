@@ -72,6 +72,10 @@ def main():
             wait(lambda: "No pedal" in conn(board), 10, "the board to say there is no pedal")
             assert board.locator(".gp-connect").is_visible(), "Connect pedal is offered in the bar"
             assert board.locator(".gp-notice-connect").is_visible(), "and in the notice panel"
+            req = board.locator(".gp-req").inner_text()
+            assert "GE150 Pro" in req and "V2.1.2 or newer" in req, f"the notice names the required device and firmware: {req}"
+            deck.locator(".gd-tab[data-tab=setup]").click()
+            assert "V2.1.2 or newer" in deck.locator(".gd-req").inner_text(), "the phone names the required firmware"
             wait(lambda: "No pedal" in phone_status(deck), 5, "the phone to say there is no pedal")
             shot(board, "no-pedal")
             # plugged in: the board connects by itself
@@ -99,6 +103,7 @@ def main():
             assert board.locator(".gp-notice-title").inner_text() == "Firmware not supported"
             assert board.locator(".gp-notice-connect").is_hidden(), "no Connect pedal for a pedal that is connected but unsupported"
             assert board.locator(".gp-faders").is_hidden(), "no faders for an unsupported pedal"
+            assert board.locator(".gp-req").is_visible(), "the requirements are shown with the refusal"
             wait(lambda: "not supported" in phone_status(deck), 5, "the phone to say the firmware is not supported")
             deck.locator(".gd-tab[data-tab=play]").click()
             assert deck.locator(".gd-next").is_disabled(), "the phone's ◀ ▶ are off for an unsupported pedal"
@@ -110,7 +115,7 @@ def main():
 
             # A pedal in use by another program.
             board = board_with(browser, "board (busy)", busy=True)
-            wait(lambda: "in use by another program" in conn(board), 15, "the board to say the pedal is busy")
+            wait(lambda: "Pedal in use" in conn(board) and "Mooer's editor" in conn(board), 15, "the board to say the pedal is busy")
             shot(board, "busy")
 
             assert not errors, f"browser errors: {errors}"

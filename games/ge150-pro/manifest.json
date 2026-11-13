@@ -3,7 +3,7 @@
   "name": "GE150 Pro",
   "version": "2026.11.13.2",
   "sdk": "^0.1",
-  "description": "Control a Mooer GE150 Pro connected to the table: shape its signal chain on the board, recall your sounds and run a click from your phone while you play.",
+  "description": "Needs a Mooer GE150 Pro (firmware V2.1.2 or newer) connected to the table by USB: shape its signal chain on the board, recall your sounds and run a click from your phone.",
   "players": {
     "min": 1,
     "max": 1

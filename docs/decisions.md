@@ -90,3 +90,8 @@ Records are history: an older record is not edited when a newer one changes it. 
 - **E-014 · 2026-11-13 · Claude** — Tables are Debian 13 PCs running Google Chrome in a kiosk (as user `table` in a
   login session) with an HP E24t G5 1920 × 1080 multitouch screen. The README's udev rule (`uaccess`) and Chrome policy
   are written for that; the browser checks run in Google Chrome; the faders follow each finger separately.
+- **E-015 · 2026-11-13 · Klaus** — Since the firmware version cannot be read, the game states what it needs: the lobby
+  tile's description, a **Requires** card on the board whenever the pedal is not ready (device, firmware V2.1.2 or
+  newer, why the version is checked by the pedal's answers, how to update), the board's settings window and the
+  phone's Pedal tab. A test keeps every mention equal to the library's minimum. *Why:* the player learns the
+  requirement before and while it matters, not from a refusal alone.

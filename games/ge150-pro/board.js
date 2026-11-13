@@ -7,6 +7,8 @@ const ID = "ge150-pro";
 const REPORT_MS = 150; // reports to the rules are merged for this long (each counts as a move)
 const SEND_MS = 40; // a fader sends at most once per this interval
 const VOLUMES = [0, 20, 40, 60, 80, 100];
+/** The oldest supported firmware (src/ge150/compat.ts MIN_FIRMWARE; the settings window needs it before the library loads). */
+const MIN_FIRMWARE = "V2.1.2";
 const CHECK_MS = 8000; // the connect sequence's answers must all arrive within this time
 /** Short titles for the notice panel, by state. */
 const TITLE = { noHid: "No USB access", noPedal: "No pedal", notChosen: "No pedal chosen", busy: "Pedal in use",
@@ -38,6 +40,7 @@ export function settings({ info, setPrefs }) {
       onChange: (v) => setPrefs({ volume: Number(v) }),
     },
     { type: "button", label: "Pedal", action: "Connect the pedal again", onChange: () => live?.reconnect() },
+    { type: "text", label: "Requires", value: `Mooer GE150 Pro by USB, firmware ${MIN_FIRMWARE} or newer` },
   ];
 }
 
@@ -57,7 +60,12 @@ export function mount(root, ctx) {
           <button class="gp-power gp-ed-power" type="button" aria-label="Switch the module on or off"></button></div>
         <div class="gp-faders"></div>
         <div class="gp-notice" hidden><div class="gp-notice-title"></div><div class="gp-notice-text"></div>
-          <button class="gp-btn primary gp-notice-connect" type="button" hidden>Connect pedal</button></div>
+          <button class="gp-btn primary gp-notice-connect" type="button" hidden>Connect pedal</button>
+          <div class="gp-req"><div class="gp-eyebrow">Requires</div>
+            <div class="gp-req-row"><b>Device</b><span>Mooer GE150 Pro, connected to this table by USB</span></div>
+            <div class="gp-req-row"><b>Firmware</b><span class="gp-req-fw"></span></div>
+            <div class="gp-req-note muted">The pedal does not tell its firmware version over USB, so the board checks how it
+              answers. Update an older pedal with Mooer's GE150 Pro editor.</div></div></div>
       </section>
       <section class="gp-side">
         <div class="gp-tabs" role="tablist"><button class="gp-tab on" type="button" data-tab="presets">Presets</button>
@@ -175,7 +183,10 @@ export function mount(root, ctx) {
     box.classList.toggle("gp-locked", show);
     if (!show) return;
     $(".gp-notice-title").textContent = TITLE[state.key] ?? "";
-    $(".gp-notice-text").textContent = state.text;
+    $(".gp-req-fw").textContent = `${lib?.MIN_FIRMWARE ?? MIN_FIRMWARE} or newer`;
+    // under its title, the sentence without its own short opening ("No pedal: connect …" → "Connect …")
+    const rest = state.text.replace(/^[^:]{1,60}: /, "");
+    $(".gp-notice-text").textContent = rest.charAt(0).toUpperCase() + rest.slice(1);
     $(".gp-notice-connect").hidden = !["noPedal", "notChosen", "busy", "unplugged"].includes(state.key);
   }
 
