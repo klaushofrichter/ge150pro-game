@@ -107,6 +107,7 @@ export function mount(root, ctx) {
     $(".gd-bpm b").textContent = String(tempo);
     $(".gd-start").textContent = c.on ? "Stop" : "Start";
     $(".gd-start").classList.toggle("on", c.on);
+    $(".gd-start").classList.toggle("primary", !c.on); // Start is the primary action; a running click's Stop is not
     $(".gd-follow").setAttribute("aria-pressed", String(c.follow));
     $(".gd-beats").textContent = `${c.beats} ${c.beats === 1 ? "beat" : "beats"}`;
     for (const s of [".gd-start", ".gd-tap", ".gd-minus", ".gd-plus", ".gd-follow", ".gd-beats"]) $(s).disabled = view.done;

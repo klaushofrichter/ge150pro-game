@@ -1,12 +1,15 @@
 /* GE150 Pro on the phone: 360 px wide, short screens, one hand. The game's tabs sit at the bottom, in thumb reach. */
-.gd { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 8px; }
-.gd-pages { flex: 1; min-height: 0; overflow-y: auto; }
+/* The game's area (#body, the platform's) grows to fill the phone while this game is shown, so the tabs sit at the
+   bottom on a short page too; on a long page they stick to the bottom of the screen. */
+#body:has(> .gd) { flex: 1; }
+.gd { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 8px; }
+.gd-pages { flex: 1; min-height: 0; }
 .gd-page { display: flex; flex-direction: column; gap: 10px; }
 .gd-page[hidden], .gd [hidden] { display: none !important; }
 .gd button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .gd-tabs { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
   padding: 6px 0 4px; background: var(--felt, #0b1f1b); }
-.gd-tab { min-height: 48px; }
+.gd-tab { min-height: 48px; transition: none; } /* instant: the platform's fade left two tabs half-lit */
 .gd-tab:hover { border-color: var(--felt-line, rgba(255, 255, 255, 0.12)); }
 .gd-tab.on, .gd-tab.on:hover { background: var(--brass); color: #1b1407; border-color: var(--brass); }
 
@@ -38,7 +41,7 @@
 .gd-click-btns, .gd-click-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .gd-click-btns button { min-height: 64px; font-size: 1.15em; }
 .gd-click-opts button { min-height: 48px; font-size: 0.9em; }
-.gd-start.on { background: rgba(210, 87, 74, 0.18); border-color: var(--ruby); color: #f1a197; }
+.gd-start.on, .gd-start.on:hover { background: rgba(210, 87, 74, 0.18); border-color: var(--ruby); color: #f1a197; }
 .gd-follow[aria-pressed="true"] { background: rgba(214, 169, 74, 0.18); border-color: var(--brass); }
 
 .gd-status-text { font-size: 1.05em; margin-top: 2px; }
