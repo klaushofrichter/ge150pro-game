@@ -24,7 +24,9 @@ library comes from, and the full protocol specification live in the GE150PRO rep
 
 ## The pedal
 
-- Send only commands observed from Mooer's editor (GE150PRO's protocol spec lists them with evidence). Never send
+- The protocol specification is `docs/protocol.md`, a sanitized copy generated from GE150PRO's original
+  (`node scripts/import-protocol.mjs ../GE150PRO/docs/protocol/README.md`). Change the original, then import again.
+- Send only commands observed from Mooer's editor (the specification lists them with evidence). Never send
   factory reset, firmware, `8B` or `BA` (they erase flash), and never try unknown command bytes or arguments.
 - Writing a preset slot (`C3`) asks first in the UI. Keep it that way.
 - The browser check uses a simulated pedal (`scripts/e2e/fake_pedal.js`); keep it answering like the hardware when the
