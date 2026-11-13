@@ -3,8 +3,8 @@
 [![PR checks](https://github.com/klaushofrichter/ge150pro-game/actions/workflows/checks.yml/badge.svg)](https://github.com/klaushofrichter/ge150pro-game/actions/workflows/checks.yml)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](https://github.com/klaushofrichter/ge150pro-game/security/dependabot)
 
-<!-- Badges render only for public repositories (the browser fetches them anonymously); while this repository is
-private they show blank. No release badge: tables run whatever the production branch holds. -->
+<!-- No release badge: this repository cuts no releases; tables run whatever the production branch holds, and the game's
+     calendar version is in games/ge150-pro/manifest.json. -->
 
 Remote control for a **Mooer GE150 Pro** guitar multi-effects pedal as a game for
 [Game Table](https://github.com/klaushofrichter/games-service): the pedal is connected to the table's computer by USB,
