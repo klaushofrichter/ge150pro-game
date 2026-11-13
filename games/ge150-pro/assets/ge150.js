@@ -577,13 +577,54 @@ function formatValue(p, raw) {
 function model(slot, type) {
   return catalog.slots[slot]?.models[type];
 }
+
+// src/ge150/compat.ts
+var MIN_FIRMWARE = "V2.1.2";
+var EXPECTED = {
+  50: { name: "system settings", bytes: 12 },
+  18: { name: "spill-over", bytes: 2 },
+  17: { name: "global EQ", bytes: 18 },
+  32: { name: "preset dump", bytes: PRESET_BODY_BYTES, count: PRESET_COUNT },
+  65: { name: "IR slot names", bytes: 640 },
+  77: { name: "IR slot data", bytes: 40 },
+  12: { name: "drum machine", bytes: 6 },
+  48: { name: "current preset", bytes: 2 + PRESET_BODY_BYTES - 17 },
+  51: { name: "EXP volume", bytes: 6 },
+  24: { name: "EXP function", bytes: 6 },
+  ...Object.fromEntries(Array.from({ length: 9 }, (_, s) => [2 + s, { name: `module ${s}`, bytes: 24 }]))
+};
+var ConnectCheck = class {
+  seen = /* @__PURE__ */ new Map();
+  bad = [];
+  /** One message from the pedal. Messages the check does not know are ignored (the pedal may send pages, `34`). */
+  push(m) {
+    const e = EXPECTED[m.cmd];
+    if (!e) return;
+    if (m.payload.length !== e.bytes) {
+      this.bad.push(`${e.name}: ${m.payload.length} bytes, expected ${e.bytes}`);
+      return;
+    }
+    this.seen.set(m.cmd, (this.seen.get(m.cmd) ?? 0) + 1);
+  }
+  result() {
+    const missing = [];
+    for (const [cmd, e] of Object.entries(EXPECTED)) {
+      const n = this.seen.get(Number(cmd)) ?? 0;
+      const want = e.count ?? 1;
+      if (n < want) missing.push(want > 1 ? `${e.name} (${n} of ${want})` : e.name);
+    }
+    return { ok: !missing.length && !this.bad.length, missing, wrong: [...this.bad] };
+  }
+};
 export {
+  ConnectCheck,
   EXP_MODULES,
   EXP_PARAMS,
   FILTER,
   GE150Pro,
   LEVEL_LABELS,
   METRONOME_STYLES,
+  MIN_FIRMWARE,
   PRESET_COUNT,
   RHYTHM_MODES,
   RHYTHM_STYLES,

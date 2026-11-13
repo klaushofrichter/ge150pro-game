@@ -48,7 +48,8 @@ export function mount(root, ctx) {
           <div class="gd-note muted">Played by the table's speakers, not through the pedal.</div></div>
       </section>
       <section class="gd-page gd-setup" data-page="setup" hidden>
-        <div class="card gd-status"><div class="eyebrow">Pedal</div><div class="gd-status-text"></div></div>
+        <div class="card gd-status"><div class="eyebrow">Pedal</div><div class="gd-status-text"></div>
+          <div class="gd-req muted">Requires a Mooer GE150 Pro with firmware V2.1.2 or newer, connected to the table by USB.</div></div>
         <div class="gd-list"></div>
         <button type="button" class="gd-finish">Finish</button>
         <div class="gd-confirm" hidden><div class="gd-confirm-text">End the session? The pedal keeps its sound; the board offers Play again.</div>
@@ -107,6 +108,7 @@ export function mount(root, ctx) {
     $(".gd-bpm b").textContent = String(tempo);
     $(".gd-start").textContent = c.on ? "Stop" : "Start";
     $(".gd-start").classList.toggle("on", c.on);
+    $(".gd-start").classList.toggle("primary", !c.on); // Start is the primary action; a running click's Stop is not
     $(".gd-follow").setAttribute("aria-pressed", String(c.follow));
     $(".gd-beats").textContent = `${c.beats} ${c.beats === 1 ? "beat" : "beats"}`;
     for (const s of [".gd-start", ".gd-tap", ".gd-minus", ".gd-plus", ".gd-follow", ".gd-beats"]) $(s).disabled = view.done;

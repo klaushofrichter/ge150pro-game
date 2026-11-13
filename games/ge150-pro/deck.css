@@ -1,14 +1,17 @@
 /* GE150 Pro on the phone: 360 px wide, short screens, one hand. The game's tabs sit at the bottom, in thumb reach. */
-.gd { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 8px; }
-.gd-pages { flex: 1; min-height: 0; overflow-y: auto; }
+/* The game's area (#body, the platform's) grows to fill the phone while this game is shown, so the tabs sit at the
+   bottom on a short page too; on a long page they stick to the bottom of the screen. */
+#body:has(> .gd) { flex: 1; }
+.gd { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 8px; }
+.gd-pages { flex: 1; min-height: 0; }
 .gd-page { display: flex; flex-direction: column; gap: 10px; }
 .gd-page[hidden], .gd [hidden] { display: none !important; }
 .gd button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .gd-tabs { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
   padding: 6px 0 4px; background: var(--felt, #0b1f1b); }
-.gd-tab { min-height: 48px; }
+.gd-tab { min-height: 48px; transition: none; } /* instant: the platform's fade left two tabs half-lit */
 .gd-tab:hover { border-color: var(--felt-line, rgba(255, 255, 255, 0.12)); }
-.gd-tab.on, .gd-tab.on:hover { background: var(--brass, #c8962f); color: #1b1407; border-color: var(--brass, #c8962f); }
+.gd-tab.on, .gd-tab.on:hover { background: var(--brass); color: #1b1407; border-color: var(--brass); }
 
 .gd-name { font-family: var(--display); font-size: 1.9em; line-height: 1.15; margin-top: 2px; word-break: break-word; }
 .gd-conn { font-size: 0.85em; margin-top: 4px; }
@@ -20,13 +23,13 @@
 .gd-slot span { font-size: 0.8em; color: var(--ink-soft); }
 .gd-slot b { font-size: 1.05em; word-break: break-word; }
 .gd-slot.empty { opacity: 0.45; }
-.gd-slot:active:not(:disabled) { background: var(--brass, #c8962f); color: #1b1407; }
+.gd-slot:active:not(:disabled) { background: var(--brass); color: #1b1407; }
 .gd-exp { font-size: 0.9em; }
 
 .gd-pr-row { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
 .gd-beat { flex: none; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.08);
   border: 2px solid rgba(255, 255, 255, 0.2); transition: background 0.06s; }
-.gd-beat.hit { background: #7fd18b; box-shadow: 0 0 16px #7fd18b; }
+.gd-beat.hit { background: var(--brass); border-color: var(--brass); box-shadow: 0 0 16px var(--brass); }
 .gd-pr-style { font-family: var(--display); font-size: 1.4em; }
 .gd-pr-detail { font-size: 0.85em; }
 .gd-note { font-size: 0.8em; margin-top: 6px; }
@@ -38,10 +41,11 @@
 .gd-click-btns, .gd-click-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .gd-click-btns button { min-height: 64px; font-size: 1.15em; }
 .gd-click-opts button { min-height: 48px; font-size: 0.9em; }
-.gd-start.on { background: #8a2c2c; border-color: #e5484d; color: #fff; }
-.gd-follow[aria-pressed="true"] { background: rgba(200, 150, 47, 0.25); border-color: var(--brass, #c8962f); }
+.gd-start.on, .gd-start.on:hover { background: rgba(210, 87, 74, 0.18); border-color: var(--ruby); color: #f1a197; }
+.gd-follow[aria-pressed="true"] { background: rgba(214, 169, 74, 0.18); border-color: var(--brass); }
 
 .gd-status-text { font-size: 1.05em; margin-top: 2px; }
+.gd-req { font-size: 0.8em; margin-top: 6px; }
 .gd-list { display: flex; flex-direction: column; gap: 6px; }
 .gd-config { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 12px;
   background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1); }
