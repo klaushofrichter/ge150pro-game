@@ -1,11 +1,9 @@
 // Which firmware the game supports, checked from the pedal's own answers at connect.
 //
-// The firmware version number cannot be read over the editor's HID channel: Mooer's editor asks for it only through
-// its update protocol (USB bulk transfers framed AA 55 99 66 … 55 AA 66 99, MyLibusb::RequestVersion_PC2MCU), which it
-// does not use with the GE150 Pro in normal operation and which this game must not send. Instead the game requires the
-// protocol of the firmware it was built and tested on: every answer firmware V2.1.2 gives to the editor's connect
-// sequence, with its exact size. V2.1.4 has the same command set (dispatcher analysis), so it passes; a firmware that
-// answers differently is refused, and the game then writes nothing to the pedal.
+// The firmware version number cannot be read over the HID control channel. Instead the game requires the protocol of
+// the firmware it was built and tested on: every answer firmware V2.1.2 gives to the connect sequence, with its exact
+// size. V2.1.4 answers the same, so it passes; a firmware that answers differently is refused, and the game then writes
+// nothing to the pedal.
 import type { Message } from './frame.ts';
 import { PRESET_BODY_BYTES, PRESET_COUNT } from './preset.ts';
 

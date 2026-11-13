@@ -79,9 +79,9 @@ multitouch screen (tables use an HP E24t G5): faders follow each finger on its o
 
 The pedal speaks a small framed protocol over a 64-byte HID interface (vendor `0x0483`, product `0x5703`). This
 repository carries the protocol library (`src/ge150/`: framing and CRC, presets, modules, system, expression pedal,
-rhythm, the model catalog, the WebHID device), bundled into `games/ge150-pro/assets/ge150.js`. The protocol
-specification is in [`docs/protocol.md`](docs/protocol.md): a sanitized copy of the original in the GE150PRO research
-repository (`klaushofrichter/GE150PRO`), which traces every claim to its evidence.
+rhythm, the model catalog, the WebHID device), bundled into `games/ge150-pro/assets/ge150.js`.
+[`docs/protocol.md`](docs/protocol.md) describes the protocol as the game uses it. The research behind it is in the
+GE150PRO repository (`klaushofrichter/GE150PRO`, private).
 
 | Path | Contents |
 | --- | --- |

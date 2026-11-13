@@ -3,7 +3,7 @@
 This repository is the Game Table game `games/ge150-pro`: remote control for a Mooer GE150 Pro guitar pedal connected
 to the table by USB, plus the protocol library it uses (`src/ge150/`). The protocol research, the web editor the
 library comes from, and the full protocol specification live in the GE150PRO repository
-(`klaushofrichter/GE150PRO`, private: `docs/protocol/README.md`, `AGENTS.md`).
+(`klaushofrichter/GE150PRO`, private).
 
 ## The game
 
@@ -24,8 +24,9 @@ library comes from, and the full protocol specification live in the GE150PRO rep
 
 ## The pedal
 
-- The protocol specification is `docs/protocol.md`, a sanitized copy generated from GE150PRO's original
-  (`node scripts/import-protocol.mjs ../GE150PRO/docs/protocol/README.md`). Change the original, then import again.
+- `docs/protocol.md` describes the protocol as the game uses it; the research and its evidence stay in GE150PRO. Keep
+  this repository to what the game needs at run time and its tests: no research notes, tool output or vendor
+  internals (E-016).
 - Send only commands observed from Mooer's editor (the specification lists them with evidence). Never send
   factory reset, firmware, `8B` or `BA` (they erase flash), and never try unknown command bytes or arguments.
 - Writing a preset slot (`C3`) asks first in the UI. Keep it that way.

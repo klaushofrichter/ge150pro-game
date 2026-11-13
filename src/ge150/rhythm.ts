@@ -1,5 +1,4 @@
-// Drum machine state. The pedal reports it; the official editor only displays it (no host setters
-// exist in the editor binary, see docs/protocol/README.md -> Rhythm).
+// Drum machine state. The pedal reports it; it is controlled on the pedal only (see docs/protocol.md).
 import { encodeMessage } from './frame.ts';
 
 export interface Rhythm {
@@ -21,8 +20,7 @@ export const RhythmCmd = {
 export const RHYTHM_MODES = ['RHYTHM', 'METRONOME'] as const;
 
 /**
- * Style names as the pedal shows them, indexed by STYLE. Read from the firmware's menu strings
- * (GE150PRO_V2.1.2.mr, offset 0x47f12); style 3 = "8 BEAT 4" matches the pedal's display.
+ * Style names as the pedal shows them, indexed by STYLE (style 3 = "8 BEAT 4").
  */
 export const RHYTHM_STYLES = [
   '8 BEAT 1', '8 BEAT 2', '8 BEAT 3', '8 BEAT 4', '8 BEAT 5', '16 BEAT 1', '16 BEAT 2', '16 BEAT 3', '16 BEAT 4', '16 BEAT 5',
@@ -31,7 +29,7 @@ export const RHYTHM_STYLES = [
   'BLUES', 'COUNTRY', 'COUNTRY FOLK', 'ROCKABILLY', 'BLUEGRASS', 'BOSSANOVA', 'RUMBA', 'SAMBA', 'CHA CHA', 'TANGO',
 ] as const;
 
-/** Metronome patterns, indexed by STYLE in METRONOME mode (same source, offset 0x48296). */
+/** Metronome patterns, indexed by STYLE in METRONOME mode. */
 export const METRONOME_STYLES = ['METRO', 'METRO 2/4', 'METRO 3/4', 'METRO 4/4', 'METRO 5/4', 'METRO 6/4', 'METRO 7/4', 'METRO 6/8', 'METRO 7/8', 'METRO 9/8'] as const;
 
 /** Display name of the current style, e.g. "8 BEAT 4" or "METRO 3/4". */
@@ -45,5 +43,5 @@ export function decodeRhythm(p: Uint8Array): Rhythm {
   return { playing: p[0] === 1, mode: p[1], style: p[2], volume: p[3], bpm: p[4] | (p[5] << 8) };
 }
 
-/** usbReceiveThread::RequestRhythmData: 8C 01, answered with 0C. */
+/** 8C 01, answered with 0C. */
 export const requestRhythm = () => encodeMessage(RhythmCmd.REQUEST, Uint8Array.of(1));

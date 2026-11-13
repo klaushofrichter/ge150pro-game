@@ -100,7 +100,7 @@
     } else if (cmd === 0x98 || cmd === 0xb3) {
       reply(0x34, [cmd === 0x98 ? 0x0f : 0x16]);
     }
-    // anything else: the real pedal's dispatcher ignores unknown codes; so does this one
+    // anything else: the real pedal ignores codes it does not know; so does this one
   }
 
   function receive(report) {

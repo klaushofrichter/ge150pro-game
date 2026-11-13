@@ -1,4 +1,4 @@
-// Preset and module codecs. Layout in docs/protocol/README.md.
+// Preset and module codecs. Layout in docs/protocol.md.
 
 export const SLOT_COUNT = 9;
 export const PRESET_COUNT = 200;
