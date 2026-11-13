@@ -11,6 +11,6 @@ const slots = full.slots.map((s) => ({
   name: s.name,
   models: s.models.map((m) => ({ index: m.index, name: m.name, params: m.params })),
 }));
-const out = { source: full.source, slots };
+const out = { source: "GE150PRO research repository (klaushofrichter/GE150PRO)", slots };
 writeFileSync(new URL("../src/ge150/catalog.json", import.meta.url), JSON.stringify(out) + "\n");
 console.log(`catalog: ${slots.map((s) => `${s.name}=${s.models.length}`).join(" ")}`);

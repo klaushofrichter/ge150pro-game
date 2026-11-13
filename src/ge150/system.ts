@@ -1,8 +1,7 @@
-// System settings. Evidence: captures/raw/session2.log (2026-11-13) and Setting::dataInit /
-// Setting::inputLevelInit / Setting::screenInit in the official editor. See docs/protocol/README.md.
+// System settings, global EQ and spill-over. See docs/protocol.md.
 import { encodeMessage } from './frame.ts';
 
-/** Level labels for INPUT LEVEL and OTG LEVEL, indexed by raw value (Setting::inputLevelInit). */
+/** Level labels for INPUT LEVEL and OTG LEVEL, indexed by raw value. */
 export const LEVEL_LABELS = [
   '-∞ dB', '-60 dB', '-45 dB', '-35 dB', '-30 dB', '-25 dB', '-20 dB', '-10 dB', '-5 dB', '0 dB',
   '0.5 dB', '1.0 dB', '1.5 dB', '2.0 dB', '2.5 dB', '3.0 dB', '3.5 dB', '4.0 dB', '4.5 dB', '5.0 dB', '5.5 dB', '6.0 dB',
@@ -32,11 +31,11 @@ export interface EqParam {
   max: number;
   step: number;
   unit: string;
-  /** Raw 0 means OFF (cut filters). Inferred from the editor showing OFF at raw 0. */
+  /** Raw 0 means OFF (cut filters). */
   zeroIsOff?: boolean;
 }
 
-/** From the range table built in Setting::dataInit: raw = (value - min) / step. */
+/** raw = (value - min) / step. */
 export const GLOBAL_EQ_PARAMS: EqParam[] = [
   { name: 'LOW FREQ', min: 30, max: 18000, step: 1, unit: 'Hz' },
   { name: 'LOW GAIN', min: -16, max: 16, step: 0.5, unit: 'dB' },

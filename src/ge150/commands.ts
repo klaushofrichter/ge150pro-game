@@ -1,10 +1,9 @@
-// Command codes and message builders. Evidence for each in docs/protocol/README.md.
+// Command codes and message builders. See docs/protocol.md.
 import { encodeMessage } from './frame.ts';
 import { encodeModule, encodeName, encodePreset, type ModuleState, type Preset } from './preset.ts';
 
 export const Cmd = {
   // host -> device
-  // Names follow the editor's usbReceiveThread::Request* functions.
   REQUEST_SYSTEM: 0x31, // RequestDeviceSystemData -> 32, 11, 12
   REQUEST_ALL_PRESETS: 0xa0,
   REQUEST_IR_AMP_NAMES: 0xc1, // RequestIrAmpName
@@ -26,7 +25,7 @@ export const Cmd = {
 
 const one = (v: number) => Uint8Array.of(v);
 
-/** The editor's connect sequence, in order. */
+/** The connect sequence, in order. */
 export const handshake = (): Uint8Array[] => [
   requestSystem(),
   encodeMessage(Cmd.REQUEST_ALL_PRESETS, one(1)),
