@@ -62,9 +62,12 @@ jobs:
       - run: npm ci
       - run: scripts/games-service.sh
       - run: pip install -r scripts/e2e/requirements.txt
-      - run: python -m playwright install --with-deps chromium
+      # Tables run Google Chrome, so the browser checks do too (WebHID is Chrome's).
+      - run: python -m playwright install --with-deps chrome
       # A simulated pedal (scripts/e2e/fake_pedal.js) stands in for the GE150 Pro: CI has no hardware.
       - run: scripts/e2e/run-all.sh e2e-out
+        env:
+          E2E_BROWSER: chrome
       - if: always()
         uses: actions/upload-artifact@v7
         with:

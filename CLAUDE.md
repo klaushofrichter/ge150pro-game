@@ -36,9 +36,9 @@ library comes from, and the full protocol specification live in the GE150PRO rep
 
 ```sh
 npm ci && scripts/games-service.sh     # dependencies, games-service checkout (.games-service)
-npm test && npm run typecheck          # unit tests (rules, library, bundle), types
+npm test && npm run typecheck          # rules, random sessions, library vs simulated pedal, intents, bundle; types
 python3 -m venv .venv && .venv/bin/pip install -r scripts/e2e/requirements.txt && .venv/bin/python -m playwright install chromium
-PATH=$PWD/.venv/bin:$PATH scripts/e2e/run-all.sh e2e-out    # browser check with the simulated pedal
+PATH=$PWD/.venv/bin:$PATH E2E_BROWSER=chrome scripts/e2e/run-all.sh e2e-out   # both browser checks, in Chrome
 ```
 
 Node 26 (`engines`). Commits: Conventional Commits, ending with the Co-Authored-By and Claude-Session lines, no model

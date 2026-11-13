@@ -42,7 +42,9 @@ def main():
     proc = start_table(PORT, TABLE_KEY=KEY, GAMES_DIR=os.path.join(ROOT, "games"), PUBLIC_URL=BASE)
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(args=["--autoplay-policy=no-user-gesture-required"])
+            # Tables run Google Chrome; E2E_BROWSER=chrome (as in CI) uses it instead of Playwright's Chromium.
+            channel = "chrome" if os.environ.get("E2E_BROWSER") == "chrome" else None
+            browser = p.chromium.launch(channel=channel, args=["--autoplay-policy=no-user-gesture-required"])
             bctx = browser.new_context(viewport={"width": 1920, "height": 1080}, has_touch=True)
             bctx.add_init_script(FAKE)
             board = bctx.new_page()

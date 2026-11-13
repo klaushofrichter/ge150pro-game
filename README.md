@@ -51,15 +51,16 @@ program can use the pedal at a time: close Mooer's own editor on that computer.
 
   `uaccess` gives the logged-in kiosk user access; use `GROUP="<the kiosk user's group>"` instead if the kiosk does
   not run in a login session. Unplug and plug the pedal afterwards.
-- **No prompt (optional):** the kiosk runs Chromium in incognito mode, so it forgets which USB devices the board may
-  use, and **Connect pedal** opens the device chooser each session. A Chromium policy allows the pedal for the board
+- **No prompt (optional):** the kiosk runs Chrome in incognito mode, so it forgets which USB devices the board may
+  use, and **Connect pedal** opens the device chooser each session. A Chrome policy allows the pedal for the board
   for good (the table host's port, 8080 by default):
 
   ```json
   { "WebHidAllowDevicesForUrls": [{ "devices": [{ "vendor_id": 1155, "product_id": 22275 }], "urls": ["http://127.0.0.1:8080"] }] }
   ```
 
-  in `/etc/chromium/policies/managed/ge150pro.json` (Chromium) or `/etc/opt/chrome/policies/managed/` (Chrome).
+  in `/etc/opt/chrome/policies/managed/ge150pro.json` (Google Chrome, which tables run) or
+  `/etc/chromium/policies/managed/` (Chromium).
 - **Windows and macOS tables:** Chrome and Edge support WebHID without extra setup; the policy above applies the same
   way.
 
@@ -87,7 +88,7 @@ npm ci && scripts/games-service.sh     # Node 26; games-service checkout in .gam
 npm test && npm run typecheck
 npm run build:assets                   # after changing src/ge150/; commit games/ge150-pro/assets/ge150.js
 python3 -m venv .venv && .venv/bin/pip install -r scripts/e2e/requirements.txt && .venv/bin/python -m playwright install chromium
-PATH=$PWD/.venv/bin:$PATH scripts/e2e/run-all.sh e2e-out
+PATH=$PWD/.venv/bin:$PATH E2E_BROWSER=chrome scripts/e2e/run-all.sh e2e-out   # in Google Chrome, as tables
 ```
 
 Branching: feature branch → PR into `main` → release PR `main` → `production`; tables install the game from

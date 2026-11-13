@@ -68,3 +68,13 @@ Records are history: an older record is not edited when a newer one changes it. 
   the pedal maker's editor: felt, brass as the only accent (a module that is on is lit in brass), the display serif for
   names, letter-spaced brass labels, pill buttons, the board games' rim (dark wood, brass ring) around the signal
   chain, jade only for the connection's OK. *Why:* it is a Game Table game and should look like one.
+- **E-012 · 2026-11-13 · Klaus (what), Claude (how)** — The checks are the gate for releasing without a person at the
+  pedal: (1) the rules on games-service's runtime, including seeded random sessions of valid and broken intents that
+  must keep the game's limits and replay exactly; (2) the protocol library's WebHID device against the simulated pedal,
+  in Node; (3) a static check that the board and phone send only intents the rules know and the manifest allows;
+  (4) the bundle as a table installs it, and the committed library bundle being current; (5) two browser checks in
+  Google Chrome, which tables run, on a real Table Host with the simulated pedal: the first session, and the flows
+  beyond it (saving, models, a board that was away carrying out a waiting command exactly once, configurations in the
+  next game, a browser without WebHID). *Why:* releases from `main` to `production` can then be automated with
+  confidence; what only the real pedal shows (USB in the kiosk, footswitch timing) stays a manual check per release
+  of the protocol use.
