@@ -24,7 +24,9 @@ library comes from, and the full protocol specification live in the GE150PRO rep
 
 ## The pedal
 
-- Send only commands observed from Mooer's editor (GE150PRO's protocol spec lists them with evidence). Never send
+- The protocol specification is `docs/protocol.md`, a sanitized copy generated from GE150PRO's original
+  (`node scripts/import-protocol.mjs ../GE150PRO/docs/protocol/README.md`). Change the original, then import again.
+- Send only commands observed from Mooer's editor (the specification lists them with evidence). Never send
   factory reset, firmware, `8B` or `BA` (they erase flash), and never try unknown command bytes or arguments.
 - Writing a preset slot (`C3`) asks first in the UI. Keep it that way.
 - The browser check uses a simulated pedal (`scripts/e2e/fake_pedal.js`); keep it answering like the hardware when the
@@ -34,9 +36,9 @@ library comes from, and the full protocol specification live in the GE150PRO rep
 
 ```sh
 npm ci && scripts/games-service.sh     # dependencies, games-service checkout (.games-service)
-npm test && npm run typecheck          # unit tests (rules, library, bundle), types
+npm test && npm run typecheck          # rules, random sessions, library vs simulated pedal, intents, bundle; types
 python3 -m venv .venv && .venv/bin/pip install -r scripts/e2e/requirements.txt && .venv/bin/python -m playwright install chromium
-PATH=$PWD/.venv/bin:$PATH scripts/e2e/run-all.sh e2e-out    # browser check with the simulated pedal
+PATH=$PWD/.venv/bin:$PATH E2E_BROWSER=chrome scripts/e2e/run-all.sh e2e-out   # both browser checks, in Chrome
 ```
 
 Node 26 (`engines`). Commits: Conventional Commits, ending with the Co-Authored-By and Claude-Session lines, no model

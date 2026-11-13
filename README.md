@@ -3,8 +3,8 @@
 [![PR checks](https://github.com/klaushofrichter/ge150pro-game/actions/workflows/checks.yml/badge.svg)](https://github.com/klaushofrichter/ge150pro-game/actions/workflows/checks.yml)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](https://github.com/klaushofrichter/ge150pro-game/security/dependabot)
 
-<!-- Badges render only for public repositories (the browser fetches them anonymously); while this repository is
-private they show blank. No release badge: tables run whatever the production branch holds. -->
+<!-- No release badge: this repository cuts no releases; tables run whatever the production branch holds, and the game's
+     calendar version is in games/ge150-pro/manifest.json. -->
 
 Remote control for a **Mooer GE150 Pro** guitar multi-effects pedal as a game for
 [Game Table](https://github.com/klaushofrichter/games-service): the pedal is connected to the table's computer by USB,
@@ -41,7 +41,15 @@ Rules for players: [`games/ge150-pro/how-to-play.md`](games/ge150-pro/how-to-pla
 The pedal must be connected to the **table's computer** by USB (the board's browser drives it over WebHID). Only one
 program can use the pedal at a time: close Mooer's own editor on that computer.
 
-- **Linux tables:** the kiosk's browser needs permission to open the pedal's HID device. Once, as root:
+- **Firmware:** the game supports GE150 Pro firmware **V2.1.2 and newer**. The version number cannot be read over the
+  pedal's editor connection, so the board checks the pedal's answers at connect against those of the supported
+  firmware; a pedal that answers differently is shown as not supported and nothing is written to it
+  ([E-013](docs/decisions.md)). Update older pedals with Mooer's editor.
+- **Without a pedal** the game still starts: the board says how to connect it and connects by itself when the pedal is
+  plugged in (also after it was unplugged during a game); the phone's table click works meanwhile.
+
+- **Linux tables (Debian 13):** the kiosk runs Google Chrome as the user `table` in a login session (games-service
+  `deploy/table-pc`). Chrome needs permission to open the pedal's HID device. Once, as root:
 
   ```sh
   echo 'SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5703", MODE="0660", TAG+="uaccess"' \
@@ -49,29 +57,31 @@ program can use the pedal at a time: close Mooer's own editor on that computer.
   udevadm control --reload && udevadm trigger
   ```
 
-  `uaccess` gives the logged-in kiosk user access; use `GROUP="<the kiosk user's group>"` instead if the kiosk does
-  not run in a login session. Unplug and plug the pedal afterwards.
-- **No prompt (optional):** the kiosk runs Chromium in incognito mode, so it forgets which USB devices the board may
-  use, and **Connect pedal** opens the device chooser each session. A Chromium policy allows the pedal for the board
+  `uaccess` gives the logged-in kiosk user (`table`, a login session through `PAMName=login`) access. Unplug and plug
+  the pedal afterwards.
+- **No prompt (optional):** the kiosk runs Chrome in incognito mode, so it forgets which USB devices the board may
+  use, and **Connect pedal** opens the device chooser each session. A Chrome policy allows the pedal for the board
   for good (the table host's port, 8080 by default):
 
   ```json
   { "WebHidAllowDevicesForUrls": [{ "devices": [{ "vendor_id": 1155, "product_id": 22275 }], "urls": ["http://127.0.0.1:8080"] }] }
   ```
 
-  in `/etc/chromium/policies/managed/ge150pro.json` (Chromium) or `/etc/opt/chrome/policies/managed/` (Chrome).
+  in `/etc/opt/chrome/policies/managed/ge150pro.json` (Google Chrome, which tables run) or
+  `/etc/chromium/policies/managed/` (Chromium).
 - **Windows and macOS tables:** Chrome and Edge support WebHID without extra setup; the policy above applies the same
   way.
 
-A remote player's board shows what happens but never controls the pedal.
+A remote player's board shows what happens but never controls the pedal. The board is made for a 1920 × 1080
+multitouch screen (tables use an HP E24t G5): faders follow each finger on its own, so two can move at once.
 
 ## How it works
 
 The pedal speaks a small framed protocol over a 64-byte HID interface (vendor `0x0483`, product `0x5703`). This
 repository carries the protocol library (`src/ge150/`: framing and CRC, presets, modules, system, expression pedal,
-rhythm, the model catalog, the WebHID device), bundled into `games/ge150-pro/assets/ge150.js`. The full protocol
-specification, with evidence for every command and the open questions, is in the GE150PRO research repository
-(`klaushofrichter/GE150PRO`, private).
+rhythm, the model catalog, the WebHID device), bundled into `games/ge150-pro/assets/ge150.js`. The protocol
+specification is in [`docs/protocol.md`](docs/protocol.md): a sanitized copy of the original in the GE150PRO research
+repository (`klaushofrichter/GE150PRO`), which traces every claim to its evidence.
 
 | Path | Contents |
 | --- | --- |
@@ -87,7 +97,7 @@ npm ci && scripts/games-service.sh     # Node 26; games-service checkout in .gam
 npm test && npm run typecheck
 npm run build:assets                   # after changing src/ge150/; commit games/ge150-pro/assets/ge150.js
 python3 -m venv .venv && .venv/bin/pip install -r scripts/e2e/requirements.txt && .venv/bin/python -m playwright install chromium
-PATH=$PWD/.venv/bin:$PATH scripts/e2e/run-all.sh e2e-out
+PATH=$PWD/.venv/bin:$PATH E2E_BROWSER=chrome scripts/e2e/run-all.sh e2e-out   # in Google Chrome, as tables
 ```
 
 Branching: feature branch → PR into `main` → release PR `main` → `production`; tables install the game from

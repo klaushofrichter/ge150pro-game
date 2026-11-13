@@ -42,7 +42,9 @@ def main():
     proc = start_table(PORT, TABLE_KEY=KEY, GAMES_DIR=os.path.join(ROOT, "games"), PUBLIC_URL=BASE)
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(args=["--autoplay-policy=no-user-gesture-required"])
+            # Tables run Google Chrome; E2E_BROWSER=chrome (as in CI) uses it instead of Playwright's Chromium.
+            channel = "chrome" if os.environ.get("E2E_BROWSER") == "chrome" else None
+            browser = p.chromium.launch(channel=channel, args=["--autoplay-policy=no-user-gesture-required"])
             bctx = browser.new_context(viewport={"width": 1920, "height": 1080}, has_touch=True)
             bctx.add_init_script(FAKE)
             board = bctx.new_page()
@@ -66,6 +68,7 @@ def main():
             wait(lambda: board.locator(".gp-dot[data-state=on]").count(), 20, "the board to connect to the pedal")
             wait(lambda: "Preset 5" in board.locator(".gp-name").inner_text(), 10, "the board to show the current preset")
             assert board.locator(".gp-label").inner_text() == "2A", board.locator(".gp-label").inner_text()
+            assert board.locator(".gp-notice").is_hidden(), "no notice once the pedal is connected and supported"
             if deck.locator("#tab-game").count():
                 deck.locator("#tab-game").click()
             wait(lambda: "Preset 5" in deck.locator(".gd-name").inner_text(), 10, "the phone to show the current preset")
@@ -131,6 +134,8 @@ def main():
             assert "123 BPM" in deck.locator(".gd-pr-detail").inner_text(), deck.locator(".gd-pr-detail").inner_text()
             deck.locator(".gd-start").click()
             wait(lambda: deck.locator(".gd-start").inner_text() == "Stop", 5, "the click to start")
+            stop = deck.evaluate("() => { const b = document.querySelector('.gd-start'); return [b.classList.contains('primary'), getComputedStyle(b).color]; }")
+            assert stop[0] is False, f"a running click's Stop is not drawn as the primary action: {stop}"
             check(deck, "phone Rhythm")
             shot(deck, "phone-rhythm")
             deck.locator(".gd-start").click()
@@ -139,6 +144,8 @@ def main():
             deck.locator(".gd-tab[data-tab=setup]").click()
             tabs_on = deck.evaluate("() => [...document.querySelectorAll('.gd-tab.on')].map((b) => b.dataset.tab)")
             assert tabs_on == ["setup"], f"the Pedal tab is the one marked: {tabs_on}"
+            tabs = deck.locator(".gd-tabs").bounding_box()
+            assert tabs["y"] + tabs["height"] > 568 - 90, f"the tabs sit at the bottom on a short page: {tabs}"
             check(deck, "phone Pedal")
             shot(deck, "phone-pedal")
             deck.locator(".gd-finish").click()

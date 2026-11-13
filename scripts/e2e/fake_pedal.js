@@ -5,6 +5,8 @@
 //   window.__pedal.press(i) a footswitch selecting preset i (the pedal reports 16)
 //   window.__pedal.state    the simulated pedal: current preset, live modules
 (() => {
+  // Options set before this script (Playwright init script): { absent, firmware: "other", busy }.
+  const opts = window.__fakePedalOptions ?? {};
   const crcTable = new Uint16Array(256).map((_, i) => {
     let c = i << 8;
     for (let k = 0; k < 8; k++) c = c & 0x8000 ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff;
@@ -71,7 +73,8 @@
       reply(0x4d, Array(40).fill(0));
       reply(0x41, Array.from({ length: 20 }, () => [..."EMPTY"].map((c) => c.charCodeAt(0)).concat(Array(27).fill(0))).flat());
     } else if (cmd === 0x8c) {
-      reply(0x0c, [1, 0, 3, 8, 123, 0]);
+      // a firmware with another protocol: here, a drum machine report one byte longer
+      reply(0x0c, opts.firmware === "other" ? [1, 0, 3, 8, 123, 0, 0] : [1, 0, 3, 8, 123, 0]);
     } else if (cmd === 0xb0) {
       reply(0x30, [state.current, 0x0e, ...body(state.current).slice(17)]);
       reply(0x33, u16(...state.exp.slice(3)));
@@ -124,6 +127,7 @@
     opened: false,
     collections: [],
     async open() {
+      if (opts.busy) throw new DOMException("Failed to open the device.", "NotAllowedError");
       this.opened = true;
     },
     async close() {
@@ -141,21 +145,42 @@
     },
   };
 
+  let plugged = !opts.absent;
+  const hidListeners = { connect: new Set(), disconnect: new Set() };
   const hid = {
     async getDevices() {
-      return [device];
+      return plugged ? [device] : [];
     },
     async requestDevice() {
-      return [device];
+      return plugged ? [device] : [];
     },
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener(type, fn) {
+      hidListeners[type]?.add(fn);
+    },
+    removeEventListener(type, fn) {
+      hidListeners[type]?.delete(fn);
+    },
+  };
+  const hidEvent = (type) => {
+    for (const fn of hidListeners[type]) fn({ device });
   };
   Object.defineProperty(Navigator.prototype, "hid", { configurable: true, get: () => hid });
 
   window.__pedal = {
     log,
     state,
+    /** Pull the USB cable: the browser reports a disconnect. */
+    unplug() {
+      plugged = false;
+      device.opened = false;
+      hidEvent("disconnect");
+    },
+    /** Plug it back in: the browser reports a connect for a device the page may use. */
+    plug() {
+      plugged = true;
+      log.length = 0;
+      hidEvent("connect");
+    },
     press(i) {
       state.current = i;
       state.live = structuredClone(presets[i - 1].modules);
