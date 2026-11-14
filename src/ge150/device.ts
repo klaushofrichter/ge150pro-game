@@ -12,6 +12,12 @@ import { decodeExpReport, ExpCmd } from './exp.ts';
 export const FILTER: HIDDeviceFilter = { vendorId: 0x0483, productId: 0x5703 };
 /** The connect sequence's answers must all arrive within this time. */
 export const CHECK_MS = 8000;
+/**
+ * After a host selection (`96`) the pedal switches its preset number at once but loads the preset's modules later:
+ * 100-150 ms, measured on V2.1.2. A `B0` in that time answers with the old modules, and a module set is overwritten
+ * by the load. So nothing is sent for this long after a selection.
+ */
+export const SELECT_SETTLE_MS = 300;
 
 export interface DeviceEvents {
   /** The connect check decided: `ok` means the pedal is supported and may be written to. */
@@ -145,12 +151,16 @@ export class GE150Pro {
     }
   }
 
-  /** Serialize writes so multi-report messages never interleave. A `B0` request queues `answered` for its answer. */
+  /**
+   * Serialize writes so multi-report messages never interleave. A `B0` request queues `answered` for its answer; a
+   * selection holds the queue until the pedal has loaded the preset.
+   */
   private send(stream: Uint8Array, answered: () => void = () => {}): Promise<void> {
     const job = this.queue.then(async () => {
       for (const r of toReports(stream)) await this.dev.sendReport(0, r);
       if (stream[4] === Cmd.REQUEST_CURRENT) this.answers.push(answered);
       this.emit('message', { cmd: stream[4], payload: stream.slice(5, stream.length - 2) }, 'out');
+      if (stream[4] === Cmd.SELECT_PRESET) await new Promise((r) => setTimeout(r, SELECT_SETTLE_MS));
     });
     this.queue = job.catch((e) => this.emit('error', e as Error));
     return job;
@@ -186,6 +196,7 @@ export class GE150Pro {
     }
   }
 
+  /** Resolves once the pedal has loaded the preset (see SELECT_SETTLE_MS). */
   selectPreset(index: number) {
     if (index < 1 || index > PRESET_COUNT) return Promise.reject(new RangeError(`preset ${index}`));
     return this.write(selectPreset(index));

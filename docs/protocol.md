@@ -43,7 +43,7 @@ between requests.
 
 | Cmd | Dir | Payload | Meaning |
 |---|---|---|---|
-| `96` | → pedal | index | select a preset. The pedal answers nothing; read the new live state with `B0 01`. |
+| `96` | → pedal | index | select a preset. The pedal answers nothing; read the new live state with `B0 01`. It loads the preset's modules 100–150 ms later: a `B0 01` before that reports the old modules, and a module set is overwritten. The library sends nothing for 300 ms after a selection. |
 | `16` | ← pedal | index | the preset was changed on the pedal (footswitch or knob), never sent for the host's own selection |
 | `20` | ← pedal | preset body | one preset of the dump |
 | `30` | ← pedal | index, page id, body bytes 17–244 | the current preset's stored copy (not unsaved changes) |

@@ -350,6 +350,7 @@ var ConnectCheck = class {
 // src/ge150/device.ts
 var FILTER = { vendorId: 1155, productId: 22275 };
 var CHECK_MS = 8e3;
+var SELECT_SETTLE_MS = 300;
 var GE150Pro = class _GE150Pro {
   rx = new Reassembler();
   queue = Promise.resolve();
@@ -444,13 +445,17 @@ var GE150Pro = class _GE150Pro {
       if (r.ok || r.wrong.length) this.decide(r);
     }
   }
-  /** Serialize writes so multi-report messages never interleave. A `B0` request queues `answered` for its answer. */
+  /**
+   * Serialize writes so multi-report messages never interleave. A `B0` request queues `answered` for its answer; a
+   * selection holds the queue until the pedal has loaded the preset.
+   */
   send(stream, answered = () => {
   }) {
     const job = this.queue.then(async () => {
       for (const r of toReports(stream)) await this.dev.sendReport(0, r);
       if (stream[4] === Cmd.REQUEST_CURRENT) this.answers.push(answered);
       this.emit("message", { cmd: stream[4], payload: stream.slice(5, stream.length - 2) }, "out");
+      if (stream[4] === Cmd.SELECT_PRESET) await new Promise((r) => setTimeout(r, SELECT_SETTLE_MS));
     });
     this.queue = job.catch((e) => this.emit("error", e));
     return job;
@@ -481,6 +486,7 @@ var GE150Pro = class _GE150Pro {
       if (i >= 0) this.answers.splice(i, 1);
     }
   }
+  /** Resolves once the pedal has loaded the preset (see SELECT_SETTLE_MS). */
   selectPreset(index) {
     if (index < 1 || index > PRESET_COUNT) return Promise.reject(new RangeError(`preset ${index}`));
     return this.write(selectPreset(index));
