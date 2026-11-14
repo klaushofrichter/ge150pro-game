@@ -6,6 +6,8 @@ import { audio as sharedAudio, esc, html, seatPlates, useStyles } from "/shared/
 const ID = "ge150-pro";
 const REPORT_MS = 150; // reports to the rules are merged for this long (each counts as a move)
 const SEND_MS = 40; // a fader sends at most once per this interval
+const EDIT_GUARD_MS = 500; // the pedal's reports for a slot edited here this recently are older than the edit
+const NOTICE_MS = 4000; // how long a passing problem shows in the bar
 const VOLUMES = [0, 20, 40, 60, 80, 100];
 /** The oldest supported firmware (src/ge150/compat.ts MIN_FIRMWARE; the settings window needs it before the library loads). */
 const MIN_FIRMWARE = "V2.1.2";
@@ -105,27 +107,24 @@ export function mount(root, ctx) {
   let lastDone = 0, lastAcked = 0; // the last command carried out by this board, and the last one reported done
   let busy = Promise.resolve();
   let pending = {}, reportTimer = null;
-  const sendTimers = new Map(), sendNext = new Map();
+  const sendTimers = new Map(), sendNext = new Map(), editedAt = new Map();
 
   const playerSeat = () => (view ? view.seat : null);
   /** This board drives the pedal: the table's own board, for the player sitting at the table (controlSeats). */
   const plays = () => !!info && !!view && info.controlSeats?.includes(view.seat);
 
   // ---- reports to the rules -------------------------------------------------------------------------------------
-  /** What the last reports said, field by field (JSON), so unchanged fields are not sent again. */
-  let sent = {};
   function report(patch) {
     if (!plays() || view?.done) return;
     if (!ready && !("connected" in patch)) return; // nothing about an unchecked pedal reaches the table
     Object.assign(pending, patch);
     reportTimer ??= setTimeout(() => {
       reportTimer = null;
-      // only what changed since the last report: the rules would drop the rest, after a round trip
-      const p = Object.fromEntries(Object.entries(pending).filter(([k, v]) => JSON.stringify(v) !== sent[k]));
+      // only what the table does not show yet (the rules' current view, so a rejected or reset state is sent again)
+      const shown = view?.pedal ?? {};
+      const p = Object.fromEntries(Object.entries(pending).filter(([k, v]) => !(k in shown) || JSON.stringify(v) !== JSON.stringify(shown[k])));
       pending = {};
-      if (!Object.keys(p).length) return;
-      for (const [k, v] of Object.entries(p)) sent[k] = JSON.stringify(v);
-      ctx.act(playerSeat(), "pedal", p);
+      if (Object.keys(p).length) ctx.act(playerSeat(), "pedal", p);
     }, REPORT_MS);
   }
   const chainOf = (mods) => mods.map((m) => ({ on: m.on, type: m.type }));
@@ -140,10 +139,10 @@ export function mount(root, ctx) {
 
   async function connect(fromTouch) {
     if (!plays() || dev || opening || dead) return;
-    await loadLib();
-    if (!navigator.hid) return status("noHid");
-    opening = true;
+    opening = true; // before any await: a second call (an update, a hotplug) waits for this one
     try {
+      await loadLib();
+      if (!navigator.hid) return status("noHid");
       const d = fromTouch ? await lib.GE150Pro.request() : await lib.GE150Pro.previouslyGranted();
       if (!d) {
         status(fromTouch ? "notChosen" : "noPedal");
@@ -180,6 +179,14 @@ export function mount(root, ctx) {
     drawNotice();
   }
 
+  /** A passing problem with a connected pedal (a bad report, a failed write): in the bar for a few seconds only. */
+  let noticeTimer = null;
+  function notice(text) {
+    $(".gp-conn-text").textContent = `${STATES[state.key].title} — ${text}`;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => ($(".gp-conn-text").textContent = STATES[state.key].title), NOTICE_MS);
+  }
+
   /** The notice panel in the editor's place while the pedal is not ready; the chain and presets dim. */
   function drawNotice() {
     const show = plays() && !ready && !view?.done;
@@ -211,7 +218,6 @@ export function mount(root, ctx) {
     dev = null;
     ready = false;
     dropEdits();
-    sent = {}; // a new connection reports everything again
   }
 
   function wire(d) {
@@ -228,6 +234,8 @@ export function mount(root, ctx) {
     d.on("switched", (i) => onSwitched(i));
     d.on("module", (slot, m) => {
       if (!modules) return;
+      // a slot edited here moments ago: this report can be the answer to an earlier read, older than the edit
+      if (Date.now() - (editedAt.get(slot) ?? 0) < EDIT_GUARD_MS) return;
       modules[slot] = m;
       afterLiveChange();
     });
@@ -248,7 +256,8 @@ export function mount(root, ctx) {
       status("unplugged");
       draw();
     });
-    d.on("error", (e) => status("error", String(e?.message ?? e)));
+    // a bad report or a failed write: shown, but the pedal stays connected (an unplugged pedal says so itself)
+    d.on("error", (e) => (ready ? notice(String(e?.message ?? e)) : status("error", String(e?.message ?? e))));
   }
 
   function adopt(index) {
@@ -286,7 +295,8 @@ export function mount(root, ctx) {
     // one queue for all pedal work, so a configuration never interleaves with a phone command
     later(async () => {
       const c = view?.configs.find((x) => x.trigger === index);
-      if (c) await applyConfig(c, true);
+      // on the preset the footswitch chose, even if a phone command queued earlier selected another one meanwhile
+      if (c) await applyConfig({ ...c, preset: index }, current !== index ? false : true);
       if (plays()) ctx.act(playerSeat(), "switched", c ? { index, config: c.id } : { index });
     });
   }
@@ -322,8 +332,15 @@ export function mount(root, ctx) {
     if (!dev) return;
     // the board switches first, so edits made while the pedal loads the preset belong to the new preset, which is
     // where the device queue delivers them
+    const before = current;
+    dropEdits(); // also when this preset is selected again: that reloads it, its edits are gone
     adopt(index);
-    await dev.selectAndRead(index);
+    try {
+      await dev.selectAndRead(index);
+    } catch (e) {
+      adopt(before); // the pedal did not switch: show what it plays
+      throw e;
+    }
   }
 
   async function applyConfig(c, fromSwitch) {
@@ -343,12 +360,14 @@ export function mount(root, ctx) {
     for (const t of sendTimers.values()) clearTimeout(t);
     sendTimers.clear();
     sendNext.clear();
+    editedAt.clear();
   }
 
   function setModule(slot, m) {
     modules[slot] = m;
     drawLive();
     sendNext.set(slot, m);
+    editedAt.set(slot, Date.now());
     if (sendTimers.has(slot)) return;
     const flush = () => {
       const next = sendNext.get(slot);
@@ -762,6 +781,8 @@ export function mount(root, ctx) {
       dead = true;
       if (live === inst) live = null;
       clearTimeout(reportTimer);
+      clearTimeout(noticeTimer);
+      dropEdits();
       if (hidWatched) navigator.hid?.removeEventListener("connect", onHidConnect);
       if (clickTimer) clearInterval(clickTimer);
       dev?.close().catch(() => {});

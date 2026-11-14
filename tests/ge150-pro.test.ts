@@ -170,11 +170,17 @@ describe("GE150 Pro", () => {
   it("starts over with the new player's own configurations when the seat changes hands", () => {
     const { rt } = connected();
     rt.submit(0, { name: "capture", payload: { config: config("a") } }, "board");
+    rt.submit(0, { name: "apply", payload: { id: "a" } }, "human"); // queued, not yet carried out by the board
     rt.seatChanged({ seat: 0, playerId: "p9", name: "Zoe", kind: "human", edge: "south" });
     const st = rt.state as any;
     expect(st.player).toBe("Zoe");
     expect(st.configs).toEqual([]);
     expect(st.synced).toBe(false);
+    // the last player's queued command and counts do not carry over; numbering goes on (the board skips done ones)
+    expect(st.commands).toEqual([]);
+    expect(st.stats).toEqual({ recalls: 0, applied: 0, switched: 0, captured: 0 });
+    rt.submit(0, { name: "select", payload: { index: 7 } }, "human");
+    expect((rt.state as any).commands[0].n).toBe(2);
   });
 });
 

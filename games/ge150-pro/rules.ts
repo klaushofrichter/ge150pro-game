@@ -376,8 +376,8 @@ export default defineGame<State>({
   },
 
   onSeatChanged(state, seat) {
-    // another person: their phone brings their own configurations
-    return { state: { ...state, player: seat.name, configs: [], synced: false } };
+    // another person: their phone brings their own configurations; the last player's queued commands and counts end
+    return { state: { ...state, player: seat.name, configs: [], synced: false, commands: [], stats: { recalls: 0, applied: 0, switched: 0, captured: 0 } } };
   },
 
   describe: describeStep,

@@ -117,14 +117,8 @@ export class GE150Pro {
 
   private onReport = (e: HIDInputReportEvent) => {
     const report = new Uint8Array(e.data.buffer, e.data.byteOffset, e.data.byteLength);
-    let messages: Message[];
-    try {
-      messages = this.rx.push(report);
-    } catch (err) {
-      this.emit('error', err as Error);
-      return;
-    }
-    for (const m of messages) this.dispatch(m);
+    for (const m of this.rx.push(report)) this.dispatch(m);
+    for (const e of this.rx.takeErrors()) this.emit('error', e);
   };
 
   private dispatch(m: Message) {
@@ -193,7 +187,6 @@ export class GE150Pro {
     }
   }
 
-  /** Resolves once the pedal has loaded the preset (see SELECT_SETTLE_MS). */
   /**
    * Select a preset and wait until its live state has been read back: the pedal answers a host selection with
    * nothing, so this asks (B0) once it has loaded the preset.
@@ -203,6 +196,7 @@ export class GE150Pro {
     await this.readCurrent();
   }
 
+  /** Resolves once the pedal has loaded the preset (see SELECT_SETTLE_MS). */
   selectPreset(index: number) {
     if (index < 1 || index > PRESET_COUNT) return Promise.reject(new RangeError(`preset ${index}`));
     return this.write(selectPreset(index));

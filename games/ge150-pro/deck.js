@@ -163,7 +163,8 @@ export function mount(root, ctx) {
   });
   $(".gd-minus").addEventListener("click", () => send("click", { bpm: Math.max(30, view.tempo - 1), follow: false }));
   $(".gd-plus").addEventListener("click", () => send("click", { bpm: Math.min(300, view.tempo + 1), follow: false }));
-  $(".gd-start").addEventListener("click", () => send("click", { on: !view.click.on, ...(view.click.on ? {} : { bpm: view.tempo }) }));
+  // following the drum machine, the click takes its tempo (which may lie outside the click's own range)
+  $(".gd-start").addEventListener("click", () => send("click", { on: !view.click.on, ...(view.click.on || view.click.follow ? {} : { bpm: view.tempo }) }));
   $(".gd-follow").addEventListener("click", () => send("click", { follow: !view.click.follow }));
   $(".gd-beats").addEventListener("click", () => {
     const order = [4, 3, 6, 2, 1];
