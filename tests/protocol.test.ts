@@ -48,6 +48,18 @@ describe('frame', () => {
     expect(msgs[0].payload).toEqual(payload);
   });
 
+  it('drops a message with a bad CRC and keeps the next one in the same report', () => {
+    const good = encodeMessage(0x16, Uint8Array.of(9));
+    const bad = encodeMessage(0x16, Uint8Array.of(5));
+    bad[bad.length - 1] ^= 0xff;
+    const stream = new Uint8Array([...bad, ...good]);
+    const rx = new Reassembler();
+    const msgs = toReports(stream).flatMap((r) => rx.push(r));
+    expect(msgs).toEqual([{ cmd: 0x16, payload: Uint8Array.of(9) }]);
+    expect(rx.takeErrors().map((e) => e.message)).toEqual(['bad CRC for cmd 0x16']);
+    expect(rx.takeErrors()).toEqual([]);
+  });
+
   it('reads and writes uint16 little-endian', () => {
     expect(toHex(packU16(1, 0x0102, 0xffff))).toBe('01000201ffff');
     expect(readU16(hex('3412'), 0)).toBe(0x1234);

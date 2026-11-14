@@ -73,7 +73,17 @@ export class CrcError extends Error {}
 export class Reassembler {
   private buf = new Uint8Array(0);
 
-  /** Feed one input report; returns every message completed by it. */
+  /** Messages dropped for a bad CRC since the last call to takeErrors(). */
+  private errors: CrcError[] = [];
+
+  /** The CRC errors met since the last call (the messages themselves were dropped, the ones after them kept). */
+  takeErrors(): CrcError[] {
+    const e = this.errors;
+    this.errors = [];
+    return e;
+  }
+
+  /** Feed one input report; returns every message completed by it. A message with a bad CRC is dropped. */
   push(report: Uint8Array): Message[] {
     const n = Math.min(report[0], report.length - 1);
     const chunk = report.subarray(1, 1 + n);
@@ -93,8 +103,8 @@ export class Reassembler {
       if (this.buf.length < len + 6) break;
       const msg = this.buf.subarray(0, len + 6);
       const crc = (msg[4 + len] << 8) | msg[5 + len];
-      if (crc16(msg.subarray(2, 4 + len)) !== crc) throw new CrcError(`bad CRC for cmd 0x${msg[4].toString(16)}`);
-      out.push({ cmd: msg[4], payload: msg.slice(5, 4 + len) });
+      if (crc16(msg.subarray(2, 4 + len)) !== crc) this.errors.push(new CrcError(`bad CRC for cmd 0x${msg[4].toString(16)}`));
+      else out.push({ cmd: msg[4], payload: msg.slice(5, 4 + len) });
       this.buf = this.buf.slice(len + 6);
     }
     return out;
