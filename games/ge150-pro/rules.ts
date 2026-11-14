@@ -87,16 +87,18 @@ export interface State {
   stats: { recalls: number; applied: number; switched: number; captured: number };
 }
 
-export const PRESETS = 200;
-export const SLOTS = 9;
-export const QUICK_SLOTS = 8;
-export const MAX_CONFIGS = 32;
+const PRESETS = 200;
+const SLOTS = 9;
+const QUICK_SLOTS = 8;
+const MAX_CONFIGS = 32;
 const MAX_COMMANDS = 16;
 const ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max) : "");
 const int = (v: unknown, lo: number, hi: number): number | null =>
   typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi ? v : null;
 const optInt = (v: unknown, lo: number, hi: number): number | null | undefined => (v === null ? null : v === undefined ? undefined : int(v, lo, hi) ?? undefined);
+/** An optional field: null when absent, the number when valid, false when present but invalid. */
+const nullable = (v: unknown, lo: number, hi: number): number | null | false => (v === null || v === undefined ? null : int(v, lo, hi) ?? false);
 
 export function presetLabel(index: number): string {
   const i = index - 1;
@@ -111,7 +113,7 @@ function module(v: unknown): ModuleSnap | null {
 }
 
 /** A configuration from a phone or the board, checked field by field; null if it is not one. */
-export function parseConfig(v: unknown): Config | null {
+function parseConfig(v: unknown): Config | null {
   const c = v as Record<string, unknown> | null;
   if (!c || typeof c !== "object" || typeof c.id !== "string" || !ID.test(c.id)) return null;
   const modules: Record<string, ModuleSnap> = {};
@@ -122,10 +124,8 @@ export function parseConfig(v: unknown): Config | null {
     if (slot === null || !snap || String(slot) !== k) return null;
     modules[k] = snap;
   }
-  const slot = c.slot === null || c.slot === undefined ? null : int(c.slot, 0, QUICK_SLOTS - 1);
-  const trigger = c.trigger === null || c.trigger === undefined ? null : int(c.trigger, 1, PRESETS);
-  const preset = c.preset === null || c.preset === undefined ? null : int(c.preset, 1, PRESETS);
-  if ((c.slot != null && slot === null) || (c.trigger != null && trigger === null) || (c.preset != null && preset === null)) return null;
+  const slot = nullable(c.slot, 0, QUICK_SLOTS - 1), trigger = nullable(c.trigger, 1, PRESETS), preset = nullable(c.preset, 1, PRESETS);
+  if (slot === false || trigger === false || preset === false) return null;
   if (!Object.keys(modules).length && preset === null) return null;
   return { id: c.id, name: text(c.name, 24) || "Configuration", slot, trigger, preset, modules };
 }
@@ -199,6 +199,9 @@ function view(s: State) {
     synced: s.synced,
     commands: s.commands,
     click: s.click,
+    /** The click's tempo now: the pedal drum machine's when following it, else its own. */
+    tempo: s.click.follow && s.pedal.rhythm?.bpm ? s.pedal.rhythm.bpm : s.click.bpm,
+    quickSlots: QUICK_SLOTS,
   };
 }
 
@@ -212,7 +215,7 @@ function describeStep(step: StepInfo<State>): StepDescription | null {
   const after = step.after;
   switch (step.intent.name) {
     case "select":
-      return { text: `selects ${presetLabel(after.commands.at(-1)?.kind === "select" ? (after.commands.at(-1) as { index: number }).index : after.pedal.current)}` };
+      return { text: `selects ${presetLabel(after.pedal.current)}` };
     case "apply":
       return { text: `recalls ${after.configs.find((c) => c.id === p.id)?.name ?? "a configuration"}` };
     case "capture":

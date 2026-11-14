@@ -3,31 +3,22 @@
 // as the supported firmware and as one that answers differently, and on hand-made answers.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ConnectCheck, MIN_FIRMWARE } from "../src/ge150/compat.ts";
+import { ConnectCheck, MIN_FIRMWARE, type CompatResult } from "../src/ge150/compat.ts";
 import { GE150Pro } from "../src/ge150/device.ts";
 import { ROOT } from "./harness.ts";
 
 const fakeSource = readFileSync(`${ROOT}/scripts/e2e/fake_pedal.js`, "utf8");
 
-/** Connects the library to a fresh simulated pedal and returns the check's result once it decides. */
+/** Connects the library to a fresh simulated pedal and returns the device and its connect check's outcome. */
 async function connectTo(options: Record<string, unknown>) {
   const g = globalThis as unknown as { window: unknown; __fakePedalOptions: unknown };
   g.window = globalThis;
   g.__fakePedalOptions = options;
   new Function(fakeSource)();
   const dev = (await GE150Pro.previouslyGranted())!;
-  const check = new ConnectCheck();
-  let decided: ReturnType<ConnectCheck["result"]> | null = null;
-  dev.on("message", (m, dir) => {
-    if (dir !== "in" || decided) return;
-    check.push(m);
-    const r = check.result();
-    if (r.ok || r.wrong.length) decided = r;
-  });
+  const checked = new Promise<CompatResult>((r) => dev.on("checked", r));
   await dev.open();
-  const end = Date.now() + 3000;
-  while (!decided && Date.now() < end) await new Promise((r) => setTimeout(r, 5));
-  return decided ?? check.result();
+  return { dev, result: await checked };
 }
 
 describe("the connect check", () => {
@@ -35,15 +26,23 @@ describe("the connect check", () => {
     expect(MIN_FIRMWARE).toBe("V2.1.2");
   });
 
-  it("accepts the supported firmware's answers", async () => {
-    const r = await connectTo({});
-    expect(r).toEqual({ ok: true, missing: [], wrong: [] });
+  it("accepts the supported firmware's answers, and then allows writes", async () => {
+    const { dev, result } = await connectTo({});
+    expect(result).toEqual({ ok: true, missing: [], wrong: [] });
+    expect(dev.supported).toBe(true);
+    await expect(dev.selectPreset(6)).resolves.toBeUndefined();
   });
 
-  it("refuses a firmware that answers with other sizes, naming what differs", async () => {
-    const r = await connectTo({ firmware: "other" });
-    expect(r.ok).toBe(false);
-    expect(r.wrong).toEqual(["drum machine: 7 bytes, expected 6"]);
+  it("refuses a firmware that answers with other sizes, naming what differs, and refuses every write", async () => {
+    const { dev, result } = await connectTo({ firmware: "other" });
+    expect(result.ok).toBe(false);
+    expect(result.wrong).toEqual(["drum machine: 7 bytes, expected 6"]);
+    expect(dev.supported).toBe(false);
+    const sent = () => (globalThis as unknown as { __pedal: { log: { cmd: number }[] } }).__pedal.log.length;
+    const before = sent();
+    await expect(dev.selectPreset(6)).rejects.toThrow(/not supported/);
+    await expect(dev.setModule(0, { on: true, type: 0, values: Array(10).fill(0) })).rejects.toThrow(/not supported/);
+    expect(sent()).toBe(before);
   });
 
   it("lists what is missing while answers are still out (or never come)", () => {

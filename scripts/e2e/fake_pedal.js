@@ -33,6 +33,10 @@
   }));
   const state = { current: 5, live: structuredClone(presets[4].modules), exp: [...presets[4].exp] };
   const moduleBytes = (m) => u16(m.on ? 1 : 0, m.type, ...m.values);
+  const readModule = (p, o = 0) => {
+    const v = Array.from({ length: 12 }, (_, k) => p[o + 2 * k] | (p[o + 2 * k + 1] << 8));
+    return { on: v[0] === 1, type: v[1], values: v.slice(2) };
+  };
   const body = (i, mods = presets[i - 1].modules, exp = presets[i - 1].exp) =>
     [i, ...[...presets[i - 1].name].map((c) => c.charCodeAt(0)), ...mods.flatMap(moduleBytes), ...u16(...exp)];
 
@@ -81,19 +85,14 @@
       reply(0x18, u16(...state.exp.slice(0, 3)));
       state.live.forEach((m, s) => reply(0x02 + s, moduleBytes(m)));
     } else if (cmd >= 0x82 && cmd <= 0x8a) {
-      const v = Array.from({ length: 12 }, (_, k) => p[2 * k] | (p[2 * k + 1] << 8));
-      state.live[cmd - 0x82] = { on: v[0] === 1, type: v[1], values: v.slice(2) };
+      state.live[cmd - 0x82] = readModule(p);
     } else if (cmd === 0x96) {
       state.current = p[0];
       state.live = structuredClone(presets[p[0] - 1].modules);
       state.exp = [...presets[p[0] - 1].exp];
     } else if (cmd === 0xc3) {
       const i = p[0];
-      for (let s = 0; s < 9; s++) {
-        const o = 17 + s * 24;
-        const v = Array.from({ length: 12 }, (_, k) => p[o + 2 * k] | (p[o + 2 * k + 1] << 8));
-        presets[i - 1].modules[s] = { on: v[0] === 1, type: v[1], values: v.slice(2) };
-      }
+      for (let s = 0; s < 9; s++) presets[i - 1].modules[s] = readModule(p, 17 + s * 24);
       reply(0x43, [i]);
     } else if (cmd === 0xb4) {
       reply(0x34, [p[0]]);
@@ -125,7 +124,6 @@
     productId: 0x5703,
     productName: "GE150Pro",
     opened: false,
-    collections: [],
     async open() {
       if (opts.busy) throw new DOMException("Failed to open the device.", "NotAllowedError");
       this.opened = true;

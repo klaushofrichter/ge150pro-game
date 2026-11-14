@@ -1,4 +1,5 @@
 // Preset and module codecs. Layout in docs/protocol.md.
+import { readU16 as u16, writeU16 as putU16 } from './frame.ts';
 
 export const SLOT_COUNT = 9;
 export const PRESET_COUNT = 200;
@@ -31,12 +32,6 @@ export interface Preset {
   modules: ModuleState[];
   exp: ExpSettings;
 }
-
-const u16 = (b: Uint8Array, off: number) => b[off] | (b[off + 1] << 8);
-const putU16 = (b: Uint8Array, off: number, v: number) => {
-  b[off] = v & 0xff;
-  b[off + 1] = (v >> 8) & 0xff;
-};
 
 export function decodeModule(b: Uint8Array, off = 0): ModuleState {
   const values: number[] = [];

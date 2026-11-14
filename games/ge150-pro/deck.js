@@ -16,9 +16,14 @@ function stored() {
   }
 }
 
+/** Keep the configurations on the phone; only when they changed (every update carries them). */
+let lastStored = "";
 function store(configs) {
+  const json = JSON.stringify(configs);
+  if (json === lastStored) return;
+  lastStored = json;
   try {
-    localStorage.setItem(STORE, JSON.stringify(configs));
+    localStorage.setItem(STORE, json);
   } catch {
     // (private browsing, or storage blocked: the configurations last for this game only)
   }
@@ -87,7 +92,7 @@ export function mount(root, ctx) {
     $(".gd-name").textContent = p.current ? `${p.names[p.current - 1] || "—"}${p.modified ? " *" : ""}` : "Waiting for the pedal";
     $(".gd-conn").textContent = view.done ? "Done" : p.connected ? "" : p.text || "Connect the pedal on the board";
     $(".gd-prev").disabled = $(".gd-next").disabled = !live;
-    const slots = Array.from({ length: 8 }, (_, q) => {
+    const slots = Array.from({ length: view.quickSlots }, (_, q) => {
       const c = view.configs.find((x) => x.slot === q);
       return `<button type="button" class="gd-slot ${c ? "" : "empty"}" data-id="${c ? esc(c.id) : ""}" ${c && live ? "" : "disabled"}>
         <span>${q + 1}</span><b>${c ? esc(c.name) : "—"}</b></button>`;
@@ -104,8 +109,7 @@ export function mount(root, ctx) {
     flash(r?.playing ? r.bpm : 0);
     // Rhythm: the table's click
     const c = view.click;
-    const tempo = c.follow && r?.bpm ? r.bpm : c.bpm;
-    $(".gd-bpm b").textContent = String(tempo);
+    $(".gd-bpm b").textContent = String(view.tempo);
     $(".gd-start").textContent = c.on ? "Stop" : "Start";
     $(".gd-start").classList.toggle("on", c.on);
     $(".gd-start").classList.toggle("primary", !c.on); // Start is the primary action; a running click's Stop is not
@@ -157,10 +161,9 @@ export function mount(root, ctx) {
       send("apply", { id: b.dataset.id });
     }
   });
-  const tempoNow = () => (view.click.follow && view.pedal.rhythm?.bpm ? view.pedal.rhythm.bpm : view.click.bpm);
-  $(".gd-minus").addEventListener("click", () => send("click", { bpm: Math.max(30, tempoNow() - 1), follow: false }));
-  $(".gd-plus").addEventListener("click", () => send("click", { bpm: Math.min(300, tempoNow() + 1), follow: false }));
-  $(".gd-start").addEventListener("click", () => send("click", { on: !view.click.on, ...(view.click.on ? {} : { bpm: tempoNow() }) }));
+  $(".gd-minus").addEventListener("click", () => send("click", { bpm: Math.max(30, view.tempo - 1), follow: false }));
+  $(".gd-plus").addEventListener("click", () => send("click", { bpm: Math.min(300, view.tempo + 1), follow: false }));
+  $(".gd-start").addEventListener("click", () => send("click", { on: !view.click.on, ...(view.click.on ? {} : { bpm: view.tempo }) }));
   $(".gd-follow").addEventListener("click", () => send("click", { follow: !view.click.follow }));
   $(".gd-beats").addEventListener("click", () => {
     const order = [4, 3, 6, 2, 1];

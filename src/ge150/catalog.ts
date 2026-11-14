@@ -8,8 +8,6 @@ export type ParamSpec =
 export interface Model {
   index: number;
   name: string;
-  /** From the GE150 Pro manual, when the model is listed there. */
-  description?: string;
   params: ParamSpec[];
 }
 

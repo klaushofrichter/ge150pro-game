@@ -20,6 +20,19 @@ export function crc16(bytes: Uint8Array): number {
   return ~c & 0xffff;
 }
 
+/** uint16 little-endian, the protocol's number format. */
+export const readU16 = (b: Uint8Array, off: number) => b[off] | (b[off + 1] << 8);
+export function writeU16(b: Uint8Array, off: number, v: number) {
+  b[off] = v & 0xff;
+  b[off + 1] = (v >> 8) & 0xff;
+}
+/** Values as consecutive uint16 little-endian. */
+export function packU16(...values: number[]): Uint8Array {
+  const b = new Uint8Array(values.length * 2);
+  values.forEach((v, i) => writeU16(b, i * 2, v));
+  return b;
+}
+
 export interface Message {
   cmd: number;
   payload: Uint8Array;
