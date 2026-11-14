@@ -171,7 +171,7 @@ export function mount(root, ctx) {
     // the bar keeps the title; the notice panel and the phone say it all
     $(".gp-conn-text").textContent = title;
     $(".gp-dot").dataset.state = connected ? "on" : "off";
-    report({ connected, text: connected ? title : `${title}: ${detail || text}` });
+    report({ connected, text: [title, detail || text].filter(Boolean).join(" — ") });
     drawNotice();
   }
 
@@ -294,13 +294,18 @@ export function mount(root, ctx) {
     for (const c of view.commands) {
       if (c.n <= lastDone) continue;
       lastDone = c.n;
-      busy = busy.then(() => (c.kind === "select" ? select(c.index) : applyConfig(c.config, false))).catch(() => {});
+      later(() => (c.kind === "select" ? select(c.index) : applyConfig(c.config, false)));
     }
-    busy = busy.then(() => {
+    later(() => {
       if (lastDone === lastAcked) return;
       lastAcked = lastDone;
       ctx.act(playerSeat(), "done", { n: lastDone });
     });
+  }
+
+  /** Pedal work runs one job at a time; a failed job (the pedal unplugged mid-way) does not stop the ones after it. */
+  function later(job) {
+    busy = busy.then(job).catch(() => {});
   }
 
   async function select(index) {
@@ -336,7 +341,7 @@ export function mount(root, ctx) {
         afterLiveChange();
         return;
       }
-      dev?.setModule(slot, structuredClone(next));
+      dev?.setModule(slot, structuredClone(next)).catch(() => {}); // (unplugged: the disconnect says so)
       sendTimers.set(slot, setTimeout(flush, SEND_MS));
     };
     flush();
@@ -395,7 +400,7 @@ export function mount(root, ctx) {
     const L = lib;
     // the chain: from the live modules here, from the view on a remote board
     const chain = plays() && modules ? modules : view.pedal.chain;
-    const tiles = Array.from({ length: 9 }, (_, s) => {
+    const tiles = Array.from({ length: L?.SLOT_COUNT ?? 9 }, (_, s) => {
       const m = chain?.[s];
       const slotName = L?.catalog.slots[s].name ?? "";
       const modelName = m && L ? L.model(s, m.type)?.name ?? `model ${m.type + 1}` : "";
@@ -525,7 +530,7 @@ export function mount(root, ctx) {
           closeSheet();
           const p = stored.get(current);
           if (!p || !dev) return;
-          await dev.storePreset({ ...p, modules: structuredClone(modules), exp: { ...p.exp, ...(exp ?? {}) } });
+          await dev.storePreset({ ...p, modules: structuredClone(modules), exp: { ...p.exp, ...(exp ?? {}) } }).catch(() => {});
         };
       },
     );
@@ -598,11 +603,12 @@ export function mount(root, ctx) {
     const t = e.target.closest(".gp-tab");
     if (t) (tab = t.dataset.tab), draw();
   });
-  $(".gp-bank-prev").addEventListener("click", () => ((bank = bank === 1 ? 50 : bank - 1), draw()));
-  $(".gp-bank-next").addEventListener("click", () => ((bank = bank === 50 ? 1 : bank + 1), draw()));
+  const banks = () => lib.PRESET_COUNT / 4;
+  $(".gp-bank-prev").addEventListener("click", () => ((bank = bank === 1 ? banks() : bank - 1), draw()));
+  $(".gp-bank-next").addEventListener("click", () => ((bank = bank === banks() ? 1 : bank + 1), draw()));
   $(".gp-abcd").addEventListener("click", (e) => {
     const b = e.target.closest(".gp-preset");
-    if (b && canEdit()) busy = busy.then(() => select(Number(b.dataset.index)));
+    if (b && canEdit()) later(() => select(Number(b.dataset.index)));
   });
   box.addEventListener("click", (e) => {
     const pw = e.target.closest("[data-power]");
@@ -617,7 +623,7 @@ export function mount(root, ctx) {
     const a = e.target.closest(".gp-apply");
     if (a && canEdit()) {
       const c = view.configs.find((x) => x.id === a.dataset.id);
-      if (c) busy = busy.then(() => applyConfig(c, false));
+      if (c) later(() => applyConfig(c, false));
       return;
     }
     const d = e.target.closest(".gp-delete");

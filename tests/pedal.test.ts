@@ -106,3 +106,13 @@ describe("the library against the simulated pedal", () => {
     expect(sent.filter((c) => !observed.has(c))).toEqual([]);
   });
 });
+
+describe("waiting for the pedal's answer", () => {
+  it("readCurrent waits for its own answer, not one to an earlier request", async () => {
+    let answers = 0;
+    dev.on("module", (s) => s === 8 && answers++);
+    dev.requestCurrent(); // unawaited, like the board after the connect check
+    await dev.readCurrent();
+    expect(answers).toBe(2);
+  });
+});

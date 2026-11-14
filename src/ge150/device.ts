@@ -43,8 +43,9 @@ export class GE150Pro {
   private dev: HIDDevice;
   private check = new ConnectCheck();
   private checkTimer: ReturnType<typeof setTimeout> | undefined;
-  /** null while the connect check runs; then whether the pedal is supported. */
-  supported: boolean | null = null;
+  private verdict: boolean | null = null;
+  /** Who waits for an answer to `B0` (the last module report), in request order. */
+  private answers: (() => void)[] = [];
 
   private constructor(dev: HIDDevice) {
     this.dev = dev;
@@ -63,12 +64,13 @@ export class GE150Pro {
     return dev ? new GE150Pro(dev) : null;
   }
 
-  on<K extends keyof DeviceEvents>(event: K, fn: Listener<K>) {
-    ((this.listeners[event] ??= []) as Listener<K>[]).push(fn);
+  /** null while the connect check runs; then whether the pedal is supported (and may be written to). */
+  get supported(): boolean | null {
+    return this.verdict;
   }
 
-  private off<K extends keyof DeviceEvents>(event: K, fn: Listener<K>) {
-    this.listeners[event] = (this.listeners[event] as Listener<K>[] | undefined)?.filter((f) => f !== fn) as never;
+  on<K extends keyof DeviceEvents>(event: K, fn: Listener<K>) {
+    ((this.listeners[event] ??= []) as Listener<K>[]).push(fn);
   }
 
   private emit<K extends keyof DeviceEvents>(event: K, ...args: Parameters<DeviceEvents[K]>) {
@@ -85,22 +87,26 @@ export class GE150Pro {
   }
 
   async close() {
-    clearTimeout(this.checkTimer);
-    this.dev.removeEventListener('inputreport', this.onReport);
-    navigator.hid.removeEventListener('disconnect', this.onDisconnect);
+    this.detach();
     if (this.dev.opened) await this.dev.close();
   }
 
-  private decide(r: CompatResult) {
-    if (this.supported !== null) return;
+  private detach() {
     clearTimeout(this.checkTimer);
-    this.supported = r.ok;
+    this.dev.removeEventListener('inputreport', this.onReport);
+    navigator.hid.removeEventListener('disconnect', this.onDisconnect);
+  }
+
+  private decide(r: CompatResult) {
+    if (this.verdict !== null) return;
+    clearTimeout(this.checkTimer);
+    this.verdict = r.ok;
     this.emit('checked', r);
   }
 
   private onDisconnect = (e: HIDConnectionEvent) => {
     if (e.device !== this.dev) return;
-    clearTimeout(this.checkTimer);
+    this.detach();
     this.emit('disconnect');
   };
 
@@ -118,11 +124,6 @@ export class GE150Pro {
 
   private dispatch(m: Message) {
     this.emit('message', m, 'in');
-    if (this.supported === null) {
-      this.check.push(m);
-      const r = this.check.result();
-      if (r.ok || r.wrong.length) this.decide(r);
-    }
     const p = m.payload;
     if (m.cmd === Cmd.PRESET_DUMP) this.emit('preset', decodePreset(p));
     else if (m.cmd === Cmd.STORE_ACK) this.emit('stored', p[0]);
@@ -135,12 +136,20 @@ export class GE150Pro {
       const patch = decodeExpReport(m.cmd, p);
       if (patch) this.emit('exp', patch);
     } else if (m.cmd === RhythmCmd.REPORT) this.emit('rhythm', decodeRhythm(p));
+    if (m.cmd === Cmd.MODULE_BASE + SLOT_COUNT - 1) this.answers.shift()?.();
+    // after the message's own event, so the outcome comes with everything the pedal has said
+    if (this.verdict === null) {
+      this.check.push(m);
+      const r = this.check.result();
+      if (r.ok || r.wrong.length) this.decide(r);
+    }
   }
 
-  /** Serialize writes so multi-report messages never interleave. */
-  private send(stream: Uint8Array): Promise<void> {
+  /** Serialize writes so multi-report messages never interleave. A `B0` request queues `answered` for its answer. */
+  private send(stream: Uint8Array, answered: () => void = () => {}): Promise<void> {
     const job = this.queue.then(async () => {
       for (const r of toReports(stream)) await this.dev.sendReport(0, r);
+      if (stream[4] === Cmd.REQUEST_CURRENT) this.answers.push(answered);
       this.emit('message', { cmd: stream[4], payload: stream.slice(5, stream.length - 2) }, 'out');
     });
     this.queue = job.catch((e) => this.emit('error', e as Error));
@@ -149,7 +158,7 @@ export class GE150Pro {
 
   /** A write: only to a pedal that passed the connect check. */
   private write(stream: Uint8Array): Promise<void> {
-    if (this.supported !== true) return Promise.reject(new Error('the pedal is not supported (or not checked yet)'));
+    if (this.verdict !== true) return Promise.reject(new Error('the pedal is not supported (or not checked yet)'));
     return this.send(stream);
   }
 
@@ -163,16 +172,17 @@ export class GE150Pro {
    * of guessing a delay. Gives up quietly after `timeoutMs`.
    */
   async readCurrent(timeoutMs = 1500): Promise<void> {
-    const last = Cmd.MODULE_BASE + SLOT_COUNT - 1;
     let done!: () => void;
-    const arrived = new Promise<void>((r) => (done = r));
-    const listener = (m: Message, dir: 'in' | 'out') => dir === 'in' && m.cmd === last && done();
-    this.on('message', listener);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const answered = new Promise<void>((r) => (done = r));
     try {
-      await this.requestCurrent();
-      await Promise.race([arrived, new Promise((r) => setTimeout(r, timeoutMs))]);
+      // answers come in request order, so this waits past the answers to earlier requests
+      await this.send(requestCurrent(), done);
+      await Promise.race([answered, new Promise((r) => (timer = setTimeout(r, timeoutMs)))]);
     } finally {
-      this.off('message', listener);
+      clearTimeout(timer);
+      const i = this.answers.indexOf(done);
+      if (i >= 0) this.answers.splice(i, 1);
     }
   }
 

@@ -309,7 +309,6 @@ function decodeExpReport(cmd, p) {
 }
 
 // src/ge150/compat.ts
-var MIN_FIRMWARE = "V2.1.2";
 var CURRENT_PRESET_BYTES = 2 + PRESET_BODY_BYTES - 1 - NAME_LENGTH;
 var EXPECTED = {
   [Cmd.SYSTEM]: { name: "system settings", bytes: 6 * 2 },
@@ -358,8 +357,9 @@ var GE150Pro = class _GE150Pro {
   dev;
   check = new ConnectCheck();
   checkTimer;
-  /** null while the connect check runs; then whether the pedal is supported. */
-  supported = null;
+  verdict = null;
+  /** Who waits for an answer to `B0` (the last module report), in request order. */
+  answers = [];
   constructor(dev) {
     this.dev = dev;
   }
@@ -374,11 +374,12 @@ var GE150Pro = class _GE150Pro {
     const dev = devs.find((d) => d.vendorId === FILTER.vendorId && d.productId === FILTER.productId);
     return dev ? new _GE150Pro(dev) : null;
   }
+  /** null while the connect check runs; then whether the pedal is supported (and may be written to). */
+  get supported() {
+    return this.verdict;
+  }
   on(event, fn) {
     (this.listeners[event] ??= []).push(fn);
-  }
-  off(event, fn) {
-    this.listeners[event] = this.listeners[event]?.filter((f) => f !== fn);
   }
   emit(event, ...args) {
     for (const fn of this.listeners[event] ?? []) fn(...args);
@@ -392,20 +393,23 @@ var GE150Pro = class _GE150Pro {
     for (const m of handshake()) await this.send(m);
   }
   async close() {
+    this.detach();
+    if (this.dev.opened) await this.dev.close();
+  }
+  detach() {
     clearTimeout(this.checkTimer);
     this.dev.removeEventListener("inputreport", this.onReport);
     navigator.hid.removeEventListener("disconnect", this.onDisconnect);
-    if (this.dev.opened) await this.dev.close();
   }
   decide(r) {
-    if (this.supported !== null) return;
+    if (this.verdict !== null) return;
     clearTimeout(this.checkTimer);
-    this.supported = r.ok;
+    this.verdict = r.ok;
     this.emit("checked", r);
   }
   onDisconnect = (e) => {
     if (e.device !== this.dev) return;
-    clearTimeout(this.checkTimer);
+    this.detach();
     this.emit("disconnect");
   };
   onReport = (e) => {
@@ -421,11 +425,6 @@ var GE150Pro = class _GE150Pro {
   };
   dispatch(m) {
     this.emit("message", m, "in");
-    if (this.supported === null) {
-      this.check.push(m);
-      const r = this.check.result();
-      if (r.ok || r.wrong.length) this.decide(r);
-    }
     const p = m.payload;
     if (m.cmd === Cmd.PRESET_DUMP) this.emit("preset", decodePreset(p));
     else if (m.cmd === Cmd.STORE_ACK) this.emit("stored", p[0]);
@@ -438,11 +437,19 @@ var GE150Pro = class _GE150Pro {
       const patch = decodeExpReport(m.cmd, p);
       if (patch) this.emit("exp", patch);
     } else if (m.cmd === RhythmCmd.REPORT) this.emit("rhythm", decodeRhythm(p));
+    if (m.cmd === Cmd.MODULE_BASE + SLOT_COUNT - 1) this.answers.shift()?.();
+    if (this.verdict === null) {
+      this.check.push(m);
+      const r = this.check.result();
+      if (r.ok || r.wrong.length) this.decide(r);
+    }
   }
-  /** Serialize writes so multi-report messages never interleave. */
-  send(stream) {
+  /** Serialize writes so multi-report messages never interleave. A `B0` request queues `answered` for its answer. */
+  send(stream, answered = () => {
+  }) {
     const job = this.queue.then(async () => {
       for (const r of toReports(stream)) await this.dev.sendReport(0, r);
+      if (stream[4] === Cmd.REQUEST_CURRENT) this.answers.push(answered);
       this.emit("message", { cmd: stream[4], payload: stream.slice(5, stream.length - 2) }, "out");
     });
     this.queue = job.catch((e) => this.emit("error", e));
@@ -450,7 +457,7 @@ var GE150Pro = class _GE150Pro {
   }
   /** A write: only to a pedal that passed the connect check. */
   write(stream) {
-    if (this.supported !== true) return Promise.reject(new Error("the pedal is not supported (or not checked yet)"));
+    if (this.verdict !== true) return Promise.reject(new Error("the pedal is not supported (or not checked yet)"));
     return this.send(stream);
   }
   /** Ask for the live state of the current preset (30, 33, 18, 02-0A). */
@@ -462,16 +469,16 @@ var GE150Pro = class _GE150Pro {
    * of guessing a delay. Gives up quietly after `timeoutMs`.
    */
   async readCurrent(timeoutMs = 1500) {
-    const last = Cmd.MODULE_BASE + SLOT_COUNT - 1;
     let done;
-    const arrived = new Promise((r) => done = r);
-    const listener = (m, dir) => dir === "in" && m.cmd === last && done();
-    this.on("message", listener);
+    let timer;
+    const answered = new Promise((r) => done = r);
     try {
-      await this.requestCurrent();
-      await Promise.race([arrived, new Promise((r) => setTimeout(r, timeoutMs))]);
+      await this.send(requestCurrent(), done);
+      await Promise.race([answered, new Promise((r) => timer = setTimeout(r, timeoutMs))]);
     } finally {
-      this.off("message", listener);
+      clearTimeout(timer);
+      const i = this.answers.indexOf(done);
+      if (i >= 0) this.answers.splice(i, 1);
     }
   }
   selectPreset(index) {
@@ -489,7 +496,6 @@ var GE150Pro = class _GE150Pro {
 export {
   FILTER,
   GE150Pro,
-  MIN_FIRMWARE,
   PRESET_COUNT,
   SLOT_COUNT,
   catalog,

@@ -40,10 +40,7 @@ export function start(game: Game, n: number, settings: Record<string, unknown> =
   return { rt, clock, state: () => rt.state as any };
 }
 
-/**
- * Play AI moves with `choose` (from the seat's view) until the game ends, firing timers whenever the phase is not
- * `playing` (between rounds).
- */
+/** The game's last log record replays to the same state hash. */
 export function replaysExactly(game: Game, rt: GameRuntime) {
   const end = rt.log.at(-1) as { t: string; stateHash?: string };
   if (end.t !== "end") throw new Error("game did not end");

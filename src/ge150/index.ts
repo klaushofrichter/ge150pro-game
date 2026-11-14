@@ -5,4 +5,3 @@ export { catalog, formatValue, model, rawFraction, rawRange } from './catalog.ts
 export { PRESET_COUNT, SLOT_COUNT, presetLabel } from './preset.ts';
 export { styleName } from './rhythm.ts';
 export { expLabel, expTarget } from './exp.ts';
-export { MIN_FIRMWARE } from './compat.ts';
