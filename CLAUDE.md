@@ -42,5 +42,5 @@ python3 -m venv .venv && .venv/bin/pip install -r scripts/e2e/requirements.txt &
 PATH=$PWD/.venv/bin:$PATH E2E_BROWSER=chrome scripts/e2e/run-all.sh e2e-out   # both browser checks, in Chrome
 ```
 
-Node 26 (`.nvmrc`, `engines`, CI). Commits: Conventional Commits, ending with the Co-Authored-By and Claude-Session lines, no model
-names. Branching: feature branch → PR into `main` → release PR `main` → `production` (tables use `production`).
+Node 26 (`.nvmrc`, `engines`, CI). Commits: Conventional Commits, ending with the Co-Authored-By and Claude-Session lines; the
+Co-Authored-By line may name the contributing model. Branching: feature branch → PR into `main` → release PR `main` → `production` (tables use `production`).
