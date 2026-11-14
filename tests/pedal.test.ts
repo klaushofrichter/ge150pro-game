@@ -48,7 +48,10 @@ beforeAll(async () => {
   dev.on("error", (e) => {
     throw e;
   });
+  // like the board: write only once the connect check has passed (the library refuses writes before)
+  const checked = new Promise<boolean>((r) => dev.on("checked", (c) => r(c.ok)));
   await dev.open();
+  expect(await checked).toBe(true);
   await until(() => presets.size === PRESET_COUNT && currents.length > 0);
 });
 
@@ -104,5 +107,15 @@ describe("the library against the simulated pedal", () => {
       ...Array.from({ length: 9 }, (_, s) => 0x82 + s)]);
     const sent = [...new Set(fake().log.map((m) => m.cmd))];
     expect(sent.filter((c) => !observed.has(c))).toEqual([]);
+  });
+});
+
+describe("waiting for the pedal's answer", () => {
+  it("readCurrent waits for its own answer, not one to an earlier request", async () => {
+    let answers = 0;
+    dev.on("module", (s) => s === 8 && answers++);
+    dev.requestCurrent(); // unawaited, like the board after the connect check
+    await dev.readCurrent();
+    expect(answers).toBe(2);
   });
 });

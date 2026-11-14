@@ -7,13 +7,13 @@
     the board connects by itself and the game goes on.
   python3 scripts/e2e/ge150_pro_pedal.py out/
 """
-import json, os, sys, time
+import os, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, ".games-service", "scripts", "e2e"))
 from playwright.sync_api import sync_playwright  # noqa: E402
-from common import errors, pick_game, start_table, watch, wait  # noqa: E402
+from common import errors, pick_game, start_table, wait  # noqa: E402
 from game_check import CHECK, TableCheck  # noqa: E402
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
@@ -23,17 +23,12 @@ BASE = f"http://127.0.0.1:{PORT}"
 KEY = "e2ekey"
 T = TableCheck(BASE, KEY, OUT, "ge150-pro-pedal", CHECK)
 a, shot, phone = T.a, T.shot, T.phone
-FAKE = open(os.path.join(HERE, "fake_pedal.js")).read()
 # Writes to the pedal: anything but the connect sequence's read-only requests.
 WRITES = "() => window.__pedal.log.filter((m) => ![0x31, 0xa0, 0xc1, 0x8c, 0xb0].includes(m.cmd)).length"
 
 
 def board_with(browser, label, **options):
-    ctx = browser.new_context(viewport={"width": 1920, "height": 1080}, has_touch=True)
-    ctx.add_init_script(f"window.__fakePedalOptions = {json.dumps(options)};\n{FAKE}")
-    page = ctx.new_page()
-    watch(page, label)
-    page.goto(BASE + "/board/")
+    page = T.board(browser, label, **options)
     page.wait_for_selector(".gp-root, button.tile")
     return page
 

@@ -5,7 +5,6 @@
 .gd { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 8px; }
 .gd-pages { flex: 1; min-height: 0; }
 .gd-page { display: flex; flex-direction: column; gap: 10px; }
-.gd-page[hidden], .gd [hidden] { display: none !important; }
 .gd button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .gd-tabs { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
   padding: 6px 0 4px; background: var(--felt, #0b1f1b); }

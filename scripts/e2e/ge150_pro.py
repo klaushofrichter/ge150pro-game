@@ -20,8 +20,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, ".games-service", "scripts", "e2e"))
 from playwright.sync_api import sync_playwright  # noqa: E402
-from common import errors, pick_game, start_table, watch, wait  # noqa: E402
-from game_check import CHECK, TableCheck  # noqa: E402
+from common import errors, pick_game, start_table, wait  # noqa: E402
+from game_check import CHECK, TableCheck, sent  # noqa: E402
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
@@ -30,12 +30,6 @@ BASE = f"http://127.0.0.1:{PORT}"
 KEY = "e2ekey"
 T = TableCheck(BASE, KEY, OUT, "ge150-pro", CHECK)
 a, shot, check, phone, problems = T.a, T.shot, T.check, T.phone, T.problems
-FAKE = open(os.path.join(HERE, "fake_pedal.js")).read()
-
-
-def sent(board, cmd):
-    """How many messages with this command byte the simulated pedal received."""
-    return board.evaluate(f"() => window.__pedal.log.filter((m) => m.cmd === {cmd}).length")
 
 
 def main():
@@ -45,11 +39,7 @@ def main():
             # Tables run Google Chrome; E2E_BROWSER=chrome (as in CI) uses it instead of Playwright's Chromium.
             channel = "chrome" if os.environ.get("E2E_BROWSER") == "chrome" else None
             browser = p.chromium.launch(channel=channel, args=["--autoplay-policy=no-user-gesture-required"])
-            bctx = browser.new_context(viewport={"width": 1920, "height": 1080}, has_touch=True)
-            bctx.add_init_script(FAKE)
-            board = bctx.new_page()
-            watch(board, "board")
-            board.goto(BASE + "/board/")
+            board = T.board(browser)
             board.wait_for_selector("button.tile")
             deck = phone(browser, "Klaus", 320, 568)
             pick_game(board, "ge150-pro")

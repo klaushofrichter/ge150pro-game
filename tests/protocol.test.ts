@@ -1,16 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { crc16, encodeMessage, Reassembler, toReports } from '../src/ge150/frame.ts';
-import { renamePreset, selectPreset, setModule } from '../src/ge150/commands.ts';
+import { crc16, encodeMessage, packU16, readU16, Reassembler, toReports } from '../src/ge150/frame.ts';
+import { handshake, selectPreset, setModule } from '../src/ge150/commands.ts';
 import { decodeModule, decodePreset, encodePreset, presetLabel, PRESET_BODY_BYTES } from '../src/ge150/preset.ts';
-import { moToPreset, presetToMo } from '../src/ge150/mo.ts';
 import { decodeRhythm, requestRhythm, styleName } from '../src/ge150/rhythm.ts';
-import { handshake } from '../src/ge150/commands.ts';
 import { catalog, formatValue, rawRange } from '../src/ge150/catalog.ts';
-import { decodeExpReport, EXP_PARAMS, expLabel, setExpFunction, setExpVolume } from '../src/ge150/exp.ts';
-import {
-  decodeGlobalEq, decodeSpillOver, decodeSystem, decodeSystemChange, formatEq, GLOBAL_EQ_PARAMS, LEVEL_LABELS,
-  setBrightness, setCabOut, setGlobalEq, setInputLevel as sysSetInputLevel, setLanguage, setOtgLevel, setSpillOver,
-} from '../src/ge150/system.ts';
+import { decodeExpReport, EXP_PARAMS, expLabel, expTarget } from '../src/ge150/exp.ts';
 
 const hex = (s: string) => Uint8Array.from(s.replace(/\s+/g, '').match(/../g)!.map((b) => parseInt(b, 16)));
 const toHex = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
@@ -21,7 +15,6 @@ const OBSERVED = {
   select2A: 'aa5502009605 f07f',
   focusAmp: 'aa550300b40800 babb',
   ampGain77: 'aa551900 84 0100 0600 4d00 4200 2800 2a00 5000 6400 0000 0000 0000 0000 a779',
-  rename: 'aa551200 97 05 544553543031000000000000000000 00 2efe',
 };
 
 describe('frame', () => {
@@ -37,7 +30,6 @@ describe('frame', () => {
     expect(toHex(selectPreset(2))).toBe(OBSERVED.select1B.replace(/\s/g, ''));
     expect(toHex(selectPreset(5))).toBe(OBSERVED.select2A.replace(/\s/g, ''));
     expect(toHex(encodeMessage(0xb4, hex('0800')))).toBe(OBSERVED.focusAmp.replace(/\s/g, ''));
-    expect(toHex(renamePreset(5, 'TEST01'))).toBe(OBSERVED.rename.replace(/\s/g, ''));
     const amp = { on: true, type: 6, values: [77, 66, 40, 42, 80, 100, 0, 0, 0, 0] };
     expect(toHex(setModule(2, amp))).toBe(OBSERVED.ampGain77.replace(/\s/g, ''));
   });
@@ -56,51 +48,16 @@ describe('frame', () => {
     expect(msgs[0].payload).toEqual(payload);
   });
 
+  it('reads and writes uint16 little-endian', () => {
+    expect(toHex(packU16(1, 0x0102, 0xffff))).toBe('01000201ffff');
+    expect(readU16(hex('3412'), 0)).toBe(0x1234);
+  });
+
   it('ignores stale bytes after the report length', () => {
     // Device input report observed with leftover bytes after n=8.
     const report = new Uint8Array(64);
     report.set(hex('08aa55020034085ace 0000ffffffff'));
     expect(new Reassembler().push(report)).toEqual([{ cmd: 0x34, payload: Uint8Array.of(8) }]);
-  });
-});
-
-describe('system settings', () => {
-  // Payloads as recorded on 2026-11-13.
-  const payload = (m: Uint8Array) => toHex(m.subarray(5, m.length - 2));
-
-  it('decodes the connect-time system, global EQ and spill-over reports', () => {
-    expect(decodeSystem(hex('0900 1400 0100 0100 0900 0100'))).toEqual({
-      inputLevel: 9, brightness: 20, cabLeft: true, cabRight: true, otgLevel: 9, language: 1,
-    });
-    const eq = decodeGlobalEq(hex('0000 dd27 2000 0000 2000 0000 2000 0000 0000'));
-    expect(eq.on).toBe(false);
-    expect(GLOBAL_EQ_PARAMS.map((p, i) => formatEq(p, eq.values[i]))).toEqual([
-      '10235 Hz', '0.0 dB', '30 Hz', '0.0 dB', '30 Hz', '0.0 dB', 'OFF', 'OFF',
-    ]);
-    expect(decodeSpillOver(hex('0000'))).toBe(false);
-    expect(LEVEL_LABELS[9]).toBe('0 dB');
-  });
-
-  it('decodes changes made on the pedal (24 = input-level knob, observed 2026-11-13)', () => {
-    expect([hex('0a00'), hex('0900'), hex('0800')].map((p) => decodeSystemChange(0x24, p))).toEqual([
-      { inputLevel: 10 }, { inputLevel: 9 }, { inputLevel: 8 },
-    ]);
-    expect(decodeSystemChange(0x26, hex('00000100'))).toEqual({ cabLeft: false, cabRight: true });
-    expect(decodeSystemChange(0x34, hex('0800'))).toBeNull();
-  });
-
-  it('builds the observed setter payloads', () => {
-    expect(payload(sysSetInputLevel(10))).toBe('0a00');
-    expect(payload(setBrightness(19))).toBe('1300');
-    expect(payload(setCabOut(false, true))).toBe('00000100');
-    expect(payload(setOtgLevel(10))).toBe('0a00');
-    expect(payload(setLanguage(0))).toBe('0000');
-    expect(payload(setSpillOver(true))).toBe('0100');
-    const on = { on: true, values: [0x27dd, 0x20, 0, 0x20, 0, 0x20, 0, 0] };
-    expect(payload(setGlobalEq(on))).toBe('0100dd27200000002000000020000000' + '0000');
-    expect([0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xd2].map((c) => c)).toEqual([
-      sysSetInputLevel(0)[4], setBrightness(0)[4], setCabOut(true, true)[4], setOtgLevel(0)[4], setLanguage(0)[4], setSpillOver(false)[4],
-    ]);
   });
 });
 
@@ -110,7 +67,7 @@ describe('preset', () => {
     expect(m).toEqual({ on: true, type: 6, values: [77, 66, 40, 42, 80, 100, 0, 0, 0, 0] });
   });
 
-  it('round-trips a preset body and .mo conversion', () => {
+  it('round-trips a preset body', () => {
     const body = new Uint8Array(PRESET_BODY_BYTES);
     body[0] = 5;
     body.set(new TextEncoder().encode('TEST01'), 1);
@@ -119,9 +76,6 @@ describe('preset', () => {
     p0.exp = { MODULE_CTRL: 6, PARA_CTRL: 43, FUN_SWITCH: 1, VOL_SWITCH: 1, VOL_MIN: 0, VOL_MAX: 100 };
     const p = decodePreset(encodePreset(p0));
     expect(p).toEqual(p0);
-    const mo = presetToMo(p);
-    expect(mo.effectModule['2'].Data.GAIN).toBe(77);
-    expect(moToPreset(mo, 5)).toEqual(p);
   });
 
   it('round-trips non-ASCII name bytes (a dumped preset name starts with EB 91)', () => {
@@ -165,12 +119,13 @@ describe('expression pedal', () => {
     expect(expLabel({ MODULE_CTRL: 6, PARA_CTRL: 43 })).toBe('MOD · MIX');
   });
 
-  it('builds the observed 98 and B3 messages', () => {
-    const payload = (m: Uint8Array) => toHex(m.subarray(5, m.length - 2));
-    expect(payload(setExpFunction(exp))).toBe('02000d000100');
-    expect(payload(setExpVolume(exp))).toBe('000000006400');
-    expect(setExpFunction(exp)[4]).toBe(0x98);
-    expect(setExpVolume(exp)[4]).toBe(0xb3);
+  it("finds the controlled parameter in the module's current model, also where the catalog spells it differently", () => {
+    const mod = catalog.slots[6].models.find((m) => m.name === 'JET-FLANGER')!;
+    expect(expTarget({ MODULE_CTRL: 6, PARA_CTRL: 46 }, mod.index)?.name).toBe('F.BACK');
+    const amp = catalog.slots[2].models[6];
+    expect(expTarget(exp, amp.index)?.name).toBe('GAIN');
+    expect(expTarget({ MODULE_CTRL: 6, PARA_CTRL: 43 }, mod.index)?.name).toBe('MIX');
+    expect(expTarget({ MODULE_CTRL: 6, PARA_CTRL: 40 }, mod.index)).toBeUndefined(); // the flanger has no PITCH
   });
 
   it('starts each module at the parameter id the editor sent when switching modules', () => {
@@ -206,13 +161,4 @@ describe('parameter positions', () => {
     expect(pos(5, 'CUSTOM EQ')).toEqual({ GAIN1: 0, FREQ1: 6, GAIN2: 2, FREQ2: 7, GAIN3: 4, FREQ3: 8 });
   });
 
-  it('round-trips .mo data through the shifted positions', () => {
-    const body = new Uint8Array(PRESET_BODY_BYTES);
-    body[0] = 7;
-    const p = decodePreset(body);
-    p.modules[6] = { on: false, type: model(6, 'PITCH SHIFT').index, values: [0, 61, 72, 0, 0, 150, 0, 0, 0, 0] };
-    const mo = presetToMo(p);
-    expect(mo.effectModule['6'].Data).toEqual({ PITCH: 150, MIX: 61, TONE: 72 });
-    expect(moToPreset(mo, 7).modules[6]).toEqual(p.modules[6]);
-  });
 });

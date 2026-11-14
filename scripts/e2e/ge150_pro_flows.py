@@ -13,8 +13,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, ".games-service", "scripts", "e2e"))
 from playwright.sync_api import sync_playwright  # noqa: E402
-from common import errors, pick_game, start_table, watch, wait  # noqa: E402
-from game_check import CHECK, TableCheck  # noqa: E402
+from common import errors, pick_game, start_table, wait  # noqa: E402
+from game_check import CHECK, TableCheck, sent  # noqa: E402
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "e2e-out"
 os.makedirs(OUT, exist_ok=True)
@@ -23,21 +23,11 @@ BASE = f"http://127.0.0.1:{PORT}"
 KEY = "e2ekey"
 T = TableCheck(BASE, KEY, OUT, "ge150-pro-flows", CHECK)
 a, shot, phone = T.a, T.shot, T.phone
-FAKE = open(os.path.join(HERE, "fake_pedal.js")).read()
 NO_HID = "Object.defineProperty(Navigator.prototype, 'hid', { configurable: true, get: () => undefined }); delete Navigator.prototype.hid;"
 
 
-def sent(board, cmd):
-    return board.evaluate(f"() => window.__pedal.log.filter((m) => m.cmd === {cmd}).length")
-
-
-def open_board(browser, script=FAKE, label="board"):
-    ctx = browser.new_context(viewport={"width": 1920, "height": 1080}, has_touch=True)
-    ctx.add_init_script(script)
-    page = ctx.new_page()
-    watch(page, label)
-    page.goto(BASE + "/board/")
-    return page
+def open_board(browser, script=None, label="board"):
+    return T.board(browser, label, script)
 
 
 def start_game(board, deck):

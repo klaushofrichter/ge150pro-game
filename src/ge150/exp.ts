@@ -1,21 +1,17 @@
 // Expression pedal assignment, per preset. See docs/protocol.md.
-import { encodeMessage } from './frame.ts';
+import { model, type ParamSpec } from './catalog.ts';
+import { readU16 } from './frame.ts';
 import type { ExpSettings } from './preset.ts';
 
 export const ExpCmd = {
-  /** MODULE_CTRL, PARA_CTRL, FUN_SWITCH (u16 LE each). Host 98, device 18. */
-  SET_FUNCTION: 0x98,
+  /** MODULE_CTRL, PARA_CTRL, FUN_SWITCH (u16 LE each). */
   FUNCTION: 0x18,
-  /** VOL_SWITCH, VOL_MIN, VOL_MAX (u16 LE each). Host B3, device 33. */
-  SET_VOLUME: 0xb3,
+  /** VOL_SWITCH, VOL_MIN, VOL_MAX (u16 LE each). */
   VOLUME: 0x33,
 } as const;
 
-/** Volume range of EXP VOL. *Inferred* from the connect value (max 100). */
-export const EXP_VOL_MAX = 100;
-
 /** Modules in chain order, with the short names the pedal's EXP menu uses. */
-export const EXP_MODULES = ['FX', 'DS', 'AMP', 'CAB', 'NS', 'EQ', 'MOD', 'DLY', 'REV'] as const;
+const EXP_MODULES = ['FX', 'DS', 'AMP', 'CAB', 'NS', 'EQ', 'MOD', 'DLY', 'REV'] as const;
 
 /**
  * Controllable parameters per module with their PARA_CTRL ids, in panel order.
@@ -41,25 +37,20 @@ export function expLabel(e: Pick<ExpSettings, 'MODULE_CTRL' | 'PARA_CTRL'>): str
   return mod && para ? `${mod} · ${para.name}` : `${e.MODULE_CTRL} / ${e.PARA_CTRL}`;
 }
 
-const u16s = (p: Uint8Array) => [0, 2, 4].map((o) => p[o] | (p[o + 1] << 8));
-const pack = (vals: number[]) => {
-  const b = new Uint8Array(6);
-  vals.forEach((v, i) => {
-    b[2 * i] = v & 0xff;
-    b[2 * i + 1] = (v >> 8) & 0xff;
-  });
-  return b;
-};
+/** The EXP menu's name for a catalog parameter, where the two spell it differently. */
+const EXP_NAME: Record<string, string> = { FEEDBACK: 'F.BACK' };
+
+/** The catalog parameter the expression pedal controls in a module of model `type`, if that model has it. */
+export function expTarget(e: Pick<ExpSettings, 'MODULE_CTRL' | 'PARA_CTRL'>, type: number): ParamSpec | undefined {
+  const name = EXP_PARAMS[e.MODULE_CTRL]?.find((p) => p.id === e.PARA_CTRL)?.name;
+  const params = model(e.MODULE_CTRL, type)?.params ?? [];
+  return name ? params.find((p) => (EXP_NAME[p.name.toUpperCase()] ?? p.name.toUpperCase()) === name) : undefined;
+}
 
 /** Decode a device report (18 or 33) into the part of ExpSettings it carries. */
 export function decodeExpReport(cmd: number, p: Uint8Array): Partial<ExpSettings> | null {
-  const [a, b, c] = u16s(p);
+  const [a, b, c] = [0, 2, 4].map((o) => readU16(p, o));
   if (cmd === ExpCmd.FUNCTION) return { MODULE_CTRL: a, PARA_CTRL: b, FUN_SWITCH: c };
   if (cmd === ExpCmd.VOLUME) return { VOL_SWITCH: a, VOL_MIN: b, VOL_MAX: c };
   return null;
 }
-
-export const setExpFunction = (e: ExpSettings) =>
-  encodeMessage(ExpCmd.SET_FUNCTION, pack([e.MODULE_CTRL, e.PARA_CTRL, e.FUN_SWITCH]));
-export const setExpVolume = (e: ExpSettings) =>
-  encodeMessage(ExpCmd.SET_VOLUME, pack([e.VOL_SWITCH, e.VOL_MIN, e.VOL_MAX]));

@@ -158,3 +158,21 @@ describe("GE150 Pro", () => {
     expect(st.synced).toBe(false);
   });
 });
+
+describe("what the rules share with the protocol library", () => {
+  it("labels presets as the library does (the rules cannot import it: tables get only games/)", async () => {
+    const { presetLabel: rulesLabel } = await import("../games/ge150-pro/rules.ts");
+    const { presetLabel } = await import("../src/ge150/preset.ts");
+    for (let i = 1; i <= 200; i++) expect(rulesLabel(i)).toBe(presetLabel(i));
+  });
+
+  it("gives board and phone the click's tempo: the drum machine's when following it, else its own", () => {
+    const { rt } = connected();
+    rt.submit(0, { name: "pedal", payload: { rhythm: { playing: true, mode: 0, style: 3, volume: 8, bpm: 123 } } }, "board");
+    rt.submit(0, { name: "click", payload: { bpm: 96, follow: true } }, "human");
+    expect((rt.boardView() as any).tempo).toBe(123);
+    rt.submit(0, { name: "click", payload: { follow: false } }, "human");
+    expect((rt.boardView() as any).tempo).toBe(96);
+    expect((rt.view(0) as any).quickSlots).toBe(8);
+  });
+});

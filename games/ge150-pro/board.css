@@ -4,18 +4,14 @@
    The bar on top, the signal chain below it, the editor and the side panel in the middle, the bottom edge left to
    the seat plate (y ≈ 950–1030) and the platform's buttons in the bottom corners. */
 .gp-root { position: absolute; inset: 0; color: var(--ink); font: 20px var(--text); }
-.gp-root[hidden], .gp-root [hidden] { display: none !important; }
+/* The player sits at the north edge: turn the board to them. */
 .gp-north { transform: rotate(180deg); }
-.gp-plates-north { transform: rotate(180deg); }
-.gp-root .muted { color: var(--ink-soft); }
 .gp-eyebrow { font-size: 15px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--brass); }
 
 /* Buttons: the platform's pill, sized for a board read from a distance. */
 .gp-root button { font-family: var(--text); touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 .gp-btn { min-height: 60px; min-width: 60px; padding: 0 28px; font-size: 22px; font-weight: 600; border-radius: 999px;
   border: 2px solid var(--felt-line); background: rgba(255, 255, 255, 0.04); color: var(--ink); }
-.gp-btn:hover { border-color: var(--brass-deep); }
-.gp-btn.primary { background: var(--brass); border-color: var(--brass); color: #1b1407; }
 
 /* The bar: connection, the current preset, Save. */
 .gp-bar { position: absolute; left: 44px; right: 44px; top: 18px; height: 72px; display: grid;

@@ -1,27 +1,33 @@
-// Which firmware the game supports, checked from the pedal's own answers at connect.
+// Which firmware the game supports, checked from the pedal's own answers at connect (GE150Pro runs the check).
 //
 // The firmware version number cannot be read over the HID control channel. Instead the game requires the protocol of
 // the firmware it was built and tested on: every answer firmware V2.1.2 gives to the connect sequence, with its exact
 // size. V2.1.4 answers the same, so it passes; a firmware that answers differently is refused, and the game then writes
 // nothing to the pedal.
+import { Cmd } from './commands.ts';
+import { ExpCmd } from './exp.ts';
 import type { Message } from './frame.ts';
-import { PRESET_BODY_BYTES, PRESET_COUNT } from './preset.ts';
+import { MODULE_BYTES, NAME_LENGTH, PRESET_BODY_BYTES, PRESET_COUNT, SLOT_COUNT } from './preset.ts';
+import { RhythmCmd, RHYTHM_BYTES } from './rhythm.ts';
 
 export const MIN_FIRMWARE = 'V2.1.2';
 
-/** Payload sizes of the answers to the connect sequence (31, A0, C1, 8C, B0) on firmware V2.1.2 and V2.1.4. */
+/** `30`: index, the page shown, then the preset body without its index and name. */
+const CURRENT_PRESET_BYTES = 2 + PRESET_BODY_BYTES - 1 - NAME_LENGTH;
+
+/** Payload sizes of the answers to the connect sequence on firmware V2.1.2 and V2.1.4. */
 const EXPECTED: Record<number, { name: string; bytes: number; count?: number }> = {
-  0x32: { name: 'system settings', bytes: 12 },
-  0x12: { name: 'spill-over', bytes: 2 },
-  0x11: { name: 'global EQ', bytes: 18 },
-  0x20: { name: 'preset dump', bytes: PRESET_BODY_BYTES, count: PRESET_COUNT },
-  0x41: { name: 'IR slot names', bytes: 640 },
-  0x4d: { name: 'IR slot data', bytes: 40 },
-  0x0c: { name: 'drum machine', bytes: 6 },
-  0x30: { name: 'current preset', bytes: 2 + PRESET_BODY_BYTES - 17 },
-  0x33: { name: 'EXP volume', bytes: 6 },
-  0x18: { name: 'EXP function', bytes: 6 },
-  ...Object.fromEntries(Array.from({ length: 9 }, (_, s) => [0x02 + s, { name: `module ${s}`, bytes: 24 }])),
+  [Cmd.SYSTEM]: { name: 'system settings', bytes: 6 * 2 },
+  [Cmd.SPILL_OVER]: { name: 'spill-over', bytes: 2 },
+  [Cmd.GLOBAL_EQ]: { name: 'global EQ', bytes: 9 * 2 },
+  [Cmd.PRESET_DUMP]: { name: 'preset dump', bytes: PRESET_BODY_BYTES, count: PRESET_COUNT },
+  [Cmd.IR_NAMES]: { name: 'IR slot names', bytes: 20 * 32 },
+  [Cmd.IR_DATA]: { name: 'IR slot data', bytes: 40 },
+  [RhythmCmd.REPORT]: { name: 'drum machine', bytes: RHYTHM_BYTES },
+  [Cmd.CURRENT_PRESET]: { name: 'current preset', bytes: CURRENT_PRESET_BYTES },
+  [ExpCmd.VOLUME]: { name: 'EXP volume', bytes: 3 * 2 },
+  [ExpCmd.FUNCTION]: { name: 'EXP function', bytes: 3 * 2 },
+  ...Object.fromEntries(Array.from({ length: SLOT_COUNT }, (_, s) => [Cmd.MODULE_BASE + s, { name: `module ${s}`, bytes: MODULE_BYTES }])),
 };
 
 export interface CompatResult {
