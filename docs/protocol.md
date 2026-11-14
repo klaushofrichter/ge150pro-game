@@ -47,7 +47,7 @@ between requests.
 | `16` | ← pedal | index | the preset was changed on the pedal (footswitch or knob), never sent for the host's own selection |
 | `20` | ← pedal | preset body | one preset of the dump |
 | `30` | ← pedal | index, page id, body bytes 17–244 | the current preset's stored copy (not unsaved changes) |
-| `97` | → pedal | index, name (16 bytes) | rename |
+| `97` | → pedal | index, name (16 bytes) | rename (the game does not send it) |
 | `C3` | → pedal | preset body | store a preset in its slot (permanent) |
 | `43` | ← pedal | index | store acknowledged |
 
@@ -82,7 +82,8 @@ DYNAMIC delay (THRES at 6). The model catalog with ranges and positions is `src/
 | `D1` | `51` | global EQ: on, then 8 values, each offset by its range's minimum |
 | `D2` | `52` | spill-over on/off |
 
-Settings take effect immediately. The reports arrive when the setting is changed on the pedal.
+Settings take effect immediately. The reports arrive when the setting is changed on the pedal. The game sends none of
+these; it checks only the sizes of the connect answers `32`, `12` and `11`.
 
 ## Expression pedal
 
@@ -93,7 +94,8 @@ Settings take effect immediately. The reports arrive when the setting is changed
 
 Parameter ids per slot: FX 0–9 and 100, DS 10–12, AMP 13–18, CAB 19–20, NS 21–24, EQ 25–38, MOD 39–50 and
 101–108, DLY 51–56, REV 57–60 and 109 (names in `src/ge150/exp.ts`). Moving a connected expression pedal produces the
-controlled module's report (`02`–`0A`).
+controlled module's report (`02`–`0A`). The game reads `18` and `33` to show the assignment; it does not send `98` or
+`B3`.
 
 ## Drum machine
 
@@ -111,7 +113,8 @@ does not use them.
 
 The firmware version cannot be read over this channel. The game supports firmware V2.1.2 and newer by checking the
 answers to the connect sequence: every answer above must arrive with its exact size within 8 seconds
-(`src/ge150/compat.ts`). A pedal that answers differently is not controlled.
+(`src/ge150/compat.ts`). Until the check passes, the library (`src/ge150/device.ts`) refuses every write, so a pedal
+that answers differently is not controlled.
 
 ## Commands the game never sends
 

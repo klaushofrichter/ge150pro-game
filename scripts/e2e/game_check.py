@@ -1,12 +1,19 @@
-"""What the game browser checks here share: the table's API, screenshots, phones that join it, the phone layout
-rules of games-service (D-065), and the drag checks of E-035. Builds on games-service's own e2e helpers (`common`,
-from .games-service).
+"""What the game browser checks here share: the table's API, screenshots, the board with the simulated pedal
+(fake_pedal.js), phones that join it, and the phone layout rules of games-service (D-065). Builds on games-service's
+own e2e helpers (`common`, from .games-service).
 
-    T = TableCheck(BASE, KEY, OUT, "chess")
+    T = TableCheck(BASE, KEY, OUT, "ge150-pro")
     a, shot, check, phone, problems = T.a, T.shot, T.check, T.phone, T.problems
 """
-import os, time
+import json, os
 from common import api, join_deck, watch
+
+FAKE = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_pedal.js")).read()
+
+
+def sent(board, cmd):
+    """How many messages with this command byte the simulated pedal received."""
+    return board.evaluate(f"() => window.__pedal.log.filter((m) => m.cmd === {cmd}).length")
 
 
 def layout_check(cards=".card", skip_svg_parts=False):
@@ -65,32 +72,12 @@ class TableCheck:
         d.label = name
         return d
 
-
-# A slow link for the board's intents (held 400 ms on the socket): what a dropped piece does while it waits shows.
-SLOW_INTENTS = """(on) => { const ws = WebSocket.prototype; ws.__send ??= ws.send;
-  ws.send = on ? function (d) { if (typeof d === "string" && d.includes('"intent"')) return void setTimeout(() => ws.__send.call(this, d), 400);
-    return ws.__send.call(this, d); } : ws.__send; }"""
-
-
-# Follows a dropped piece frame by frame (the piece nearest to where it was last seen, starting at the drop): it must
-# only ever come closer to where it ends, never slide back toward where it came from first; and no piece may show where
-# the dragged one started, which is a jump back (E-035).
-PATH_WATCH = """([sel, x, y, ox, oy]) => { const path = (window.__path = []); window.__home = 0; let p = { x, y };
-  const until = performance.now() + 1200;
-  const look = () => { let best = null, bd = Infinity;
-    for (const e of document.querySelectorAll(sel)) { const r = e.getBoundingClientRect(), c = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-      if (Math.hypot(c.x - ox, c.y - oy) < 6) window.__home++;
-      const d = Math.hypot(c.x - p.x, c.y - p.y); if (d < bd) { bd = d; best = c; } }
-    if (best) path.push((p = best));
-    if (performance.now() < until) requestAnimationFrame(look); };
-  requestAnimationFrame(look); }"""
-
-
-def settles_smoothly(board, what):
-    time.sleep(1.3)
-    path = board.evaluate("() => window.__path")
-    end = path[-1]
-    d = [((q["x"] - end["x"]) ** 2 + (q["y"] - end["y"]) ** 2) ** 0.5 for q in path]
-    back = max((b - a for a, b in zip(d, d[1:])), default=0)
-    assert back <= 3, f"{what}: moved {back:.0f}px away from where it ends, after the drop"
-    assert board.evaluate("() => window.__home") == 0, f"{what}: jumped back to where it started"
+    def board(self, browser, label="board", script=None, **pedal):
+        """The table's board at 1920x1080 with the simulated pedal (`pedal` are its options), or with another init
+        script instead."""
+        ctx = browser.new_context(viewport={"width": 1920, "height": 1080}, has_touch=True)
+        ctx.add_init_script(script if script is not None else f"window.__fakePedalOptions = {json.dumps(pedal)};\n{FAKE}")
+        page = ctx.new_page()
+        watch(page, label)
+        page.goto(self.base + "/board/")
+        return page

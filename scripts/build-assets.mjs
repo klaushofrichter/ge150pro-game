@@ -1,7 +1,6 @@
 // Bundles the protocol library (src/ge150/, with the model catalog) into games/ge150-pro/assets/ge150.js, the one
 // module the board and the phone import. Commit the result; tests/assets.test.ts fails while it is out of date.
-//   node scripts/build-assets.mjs            write the asset
-//   node scripts/build-assets.mjs --stdout   print the bundle (used by the test)
+//   node scripts/build-assets.mjs   write the asset (the test compares it with bundle())
 import { build } from "esbuild";
 import { writeFileSync } from "node:fs";
 
@@ -20,9 +19,6 @@ export async function bundle() {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const js = await bundle();
-  if (process.argv.includes("--stdout")) process.stdout.write(js);
-  else {
-    writeFileSync(new URL("../games/ge150-pro/assets/ge150.js", import.meta.url), js);
-    console.log(`games/ge150-pro/assets/ge150.js: ${js.length} bytes`);
-  }
+  writeFileSync(new URL("../games/ge150-pro/assets/ge150.js", import.meta.url), js);
+  console.log(`games/ge150-pro/assets/ge150.js: ${js.length} bytes`);
 }

@@ -44,21 +44,6 @@ export function start(game: Game, n: number, settings: Record<string, unknown> =
  * Play AI moves with `choose` (from the seat's view) until the game ends, firing timers whenever the phase is not
  * `playing` (between rounds).
  */
-export function playOut(rt: GameRuntime, clock: VirtualClock, choose: (view: any) => unknown, cap = 40000) {
-  for (let guard = 0; !rt.over && guard < cap; guard++) {
-    const st = rt.state as { phase: string; turn: number };
-    if (st.phase !== "playing") {
-      clock.advance();
-      continue;
-    }
-    const m = choose(rt.view(st.turn));
-    if (!m) throw new Error("the AI found no move");
-    const r = rt.submit(st.turn, m as any, "ai");
-    if (r && r.ok === false) throw new Error(`the AI's move was refused: ${r.reason}`);
-  }
-}
-
-/** The game's last log record replays to the same state hash. */
 export function replaysExactly(game: Game, rt: GameRuntime) {
   const end = rt.log.at(-1) as { t: string; stateHash?: string };
   if (end.t !== "end") throw new Error("game did not end");

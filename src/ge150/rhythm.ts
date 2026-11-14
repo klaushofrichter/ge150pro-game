@@ -1,5 +1,5 @@
 // Drum machine state. The pedal reports it; it is controlled on the pedal only (see docs/protocol.md).
-import { encodeMessage } from './frame.ts';
+import { encodeMessage, readU16 } from './frame.ts';
 
 export interface Rhythm {
   playing: boolean;
@@ -16,8 +16,6 @@ export const RhythmCmd = {
   REPORT: 0x0c,
   REQUEST: 0x8c,
 } as const;
-
-export const RHYTHM_MODES = ['RHYTHM', 'METRONOME'] as const;
 
 /**
  * Style names as the pedal shows them, indexed by STYLE (style 3 = "8 BEAT 4").
@@ -39,8 +37,9 @@ export function styleName(r: Pick<Rhythm, 'mode' | 'style'>): string {
 }
 
 /** Payload of 0C: on, mode, style, volume (u8 each), BPM (u16 LE). */
+export const RHYTHM_BYTES = 6;
 export function decodeRhythm(p: Uint8Array): Rhythm {
-  return { playing: p[0] === 1, mode: p[1], style: p[2], volume: p[3], bpm: p[4] | (p[5] << 8) };
+  return { playing: p[0] === 1, mode: p[1], style: p[2], volume: p[3], bpm: readU16(p, 4) };
 }
 
 /** 8C 01, answered with 0C. */

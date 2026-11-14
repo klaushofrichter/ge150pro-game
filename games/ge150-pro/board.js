@@ -1,7 +1,7 @@
 // GE150 Pro on the board: the pedal's signal chain and its parameters by touch, the presets, and the configurations
 // the phone recalls. The pedal is driven over WebHID by the table's own board only, for the player sitting at it
 // (E-002); a remote board shows the state and a note. The protocol library is assets/ge150.js (src/ge150/).
-import { esc, html, seatPlates, useStyles } from "/shared/board-kit.js";
+import { audio as sharedAudio, esc, html, seatPlates, useStyles } from "/shared/board-kit.js";
 
 const ID = "ge150-pro";
 const REPORT_MS = 150; // reports to the rules are merged for this long (each counts as a move)
@@ -9,19 +9,21 @@ const SEND_MS = 40; // a fader sends at most once per this interval
 const VOLUMES = [0, 20, 40, 60, 80, 100];
 /** The oldest supported firmware (src/ge150/compat.ts MIN_FIRMWARE; the settings window needs it before the library loads). */
 const MIN_FIRMWARE = "V2.1.2";
-const CHECK_MS = 8000; // the connect sequence's answers must all arrive within this time
-/** Short titles for the notice panel, by state. */
-const TITLE = { noHid: "No USB access", noPedal: "No pedal", notChosen: "No pedal chosen", busy: "Pedal in use",
-  loading: "Connecting…", unplugged: "Pedal disconnected", unsupported: "Firmware not supported" };
-const TEXT = {
-  noHid: "This browser cannot reach USB devices (WebHID): the table needs Google Chrome",
-  noPedal: "No pedal: connect the GE150 Pro by USB, then tap Connect pedal",
-  notChosen: "No pedal chosen: tap Connect pedal and choose GE150Pro",
-  busy: "The pedal is in use by another program: close Mooer's editor, then tap Connect pedal",
-  loading: "Loading the presets…",
-  connected: "Connected",
-  unplugged: "The pedal was disconnected: plug it in again",
-  unsupported: (min) => `This pedal's firmware is not supported: the game needs firmware ${min} or newer. Update it with Mooer's editor; the game changes nothing on this pedal.`,
+/**
+ * What the board says about the pedal, by state: the short title (the bar and the notice panel), the explanation
+ * under it, and the full sentence the phone shows. `retry` offers Connect pedal.
+ */
+const STATES = {
+  noHid: { title: "No USB access", text: "This browser cannot reach USB devices (WebHID): the table needs Google Chrome." },
+  noPedal: { title: "No pedal", text: "Connect the GE150 Pro by USB, then tap Connect pedal.", retry: true },
+  notChosen: { title: "No pedal chosen", text: "Tap Connect pedal and choose GE150Pro.", retry: true },
+  busy: { title: "Pedal in use", text: "Another program uses the pedal: close Mooer's editor, then tap Connect pedal.", retry: true },
+  loading: { title: "Connecting…", text: "Loading the presets…" },
+  connected: { title: "Connected", text: "" },
+  unplugged: { title: "Pedal disconnected", text: "Plug it in again.", retry: true },
+  unsupported: { title: "Firmware not supported",
+    text: `The game needs firmware ${MIN_FIRMWARE} or newer. Update the pedal with Mooer's editor; the game changes nothing on this pedal.` },
+  error: { title: "Pedal error", text: "" },
 };
 const prefsOf = (info) => ({ volume: VOLUMES.includes(info?.prefs?.volume) ? info.prefs.volume : 60 });
 
@@ -90,19 +92,19 @@ export function mount(root, ctx) {
 
   let info = null, view = null, lib = null, dev = null, dead = false;
   let opening = false;
-  /** The connect check (E-013): the game writes to the pedal only once its answers are the supported firmware's. */
-  let check = null, ready = false, checkTimer = null;
-  /** What the board says about the pedal while it is not ready: { key, text }. */
-  let state = { key: "loading", text: TEXT.loading };
+  /** The pedal passed the connect check (E-013, run by the library, which refuses writes until then). */
+  let ready = false;
+  /** What the board says about the pedal: a key of STATES, and the detail of an error. */
+  let state = { key: "loading", detail: "" };
   /** Stored presets from the dump, index 1..200 → Preset. */
   const stored = new Map();
   /** Live state of the current preset on the pedal. */
   let current = 0, modules = null, exp = null, rhythm = null;
   let selected = 2; // module slot open in the editor
   let bank = 1, tab = "presets";
-  let lastDone = 0; // the last command carried out by this board
+  let lastDone = 0, lastAcked = 0; // the last command carried out by this board, and the last one reported done
   let busy = Promise.resolve();
-  let pending = {}, reportTimer = null, namesSent = false;
+  let pending = {}, reportTimer = null;
   const sendTimers = new Map(), sendNext = new Map();
 
   const playerSeat = () => (view ? view.seat : null);
@@ -134,44 +136,42 @@ export function mount(root, ctx) {
   async function connect(fromTouch) {
     if (!plays() || dev || opening || dead) return;
     const L = await loadLib();
-    if (!navigator.hid) return status(TEXT.noHid, false);
+    if (!navigator.hid) return status("noHid");
     opening = true;
     try {
       const d = fromTouch ? await L.GE150Pro.request() : await L.GE150Pro.previouslyGranted();
       if (!d) {
-        status(fromTouch ? TEXT.notChosen : TEXT.noPedal, false);
+        status(fromTouch ? "notChosen" : "noPedal");
         return;
       }
       wire(d);
       dev = d;
-      check = new L.ConnectCheck();
       ready = false;
-      status(TEXT.loading, false);
-      clearTimeout(checkTimer);
-      checkTimer = setTimeout(() => !ready && unsupported(), CHECK_MS);
+      status("loading");
       try {
         await d.open();
       } catch {
-        clearTimeout(checkTimer);
+        d.close().catch(() => {});
         dev = null;
-        status(TEXT.busy, false);
+        status("busy");
       }
     } catch (e) {
       dev = null;
-      status(fromTouch && e?.name === "NotFoundError" ? TEXT.notChosen : TEXT.noPedal, false);
+      status(fromTouch && e?.name === "NotFoundError" ? "notChosen" : "noPedal");
     } finally {
       opening = false;
       draw();
     }
   }
 
-  function status(text, connected) {
-    const key = Object.keys(TEXT).find((k) => (typeof TEXT[k] === "function" ? text.startsWith("This pedal's firmware") : TEXT[k] === text)) ?? "loading";
-    state = { key, text };
-    // the bar keeps the short part; the notice panel says it all
-    $(".gp-conn-text").textContent = connected ? text : TITLE[key] ?? text;
+  function status(key, detail = "") {
+    state = { key, detail };
+    const connected = key === "connected";
+    const { title, text } = STATES[key];
+    // the bar keeps the title; the notice panel and the phone say it all
+    $(".gp-conn-text").textContent = title;
     $(".gp-dot").dataset.state = connected ? "on" : "off";
-    report({ connected, text });
+    report({ connected, text: connected ? title : `${title}: ${detail || text}` });
     drawNotice();
   }
 
@@ -182,21 +182,18 @@ export function mount(root, ctx) {
     $(".gp-faders").hidden = show;
     box.classList.toggle("gp-locked", show);
     if (!show) return;
-    $(".gp-notice-title").textContent = TITLE[state.key] ?? "";
-    $(".gp-req-fw").textContent = `${lib?.MIN_FIRMWARE ?? MIN_FIRMWARE} or newer`;
-    // under its title, the sentence without its own short opening ("No pedal: connect …" → "Connect …")
-    const rest = state.text.replace(/^[^:]{1,60}: /, "");
-    $(".gp-notice-text").textContent = rest.charAt(0).toUpperCase() + rest.slice(1);
-    $(".gp-notice-connect").hidden = !["noPedal", "notChosen", "busy", "unplugged"].includes(state.key);
+    const st = STATES[state.key];
+    $(".gp-notice-title").textContent = st.title;
+    $(".gp-req-fw").textContent = `${MIN_FIRMWARE} or newer`;
+    $(".gp-notice-text").textContent = state.detail || st.text;
+    $(".gp-notice-connect").hidden = !st.retry;
   }
 
   /** All answers of the connect sequence arrived as the supported firmware gives them. */
   function supported(d) {
-    clearTimeout(checkTimer);
     ready = true;
-    namesSent = true;
     const names = Array.from({ length: lib.PRESET_COUNT }, (_, i) => stored.get(i + 1)?.name.trim() ?? "");
-    status(TEXT.connected, true);
+    status("connected");
     // everything held back while the check ran, in one report
     report({ names, ...(current ? { current } : {}), ...(modules ? { chain: chainOf(modules), modified: modifiedNow() } : {}), ...(rhythm ? { rhythm } : {}) });
     reportExp();
@@ -205,22 +202,17 @@ export function mount(root, ctx) {
     draw();
   }
 
-  /** Another firmware (or no answer): the pedal stays connected but the game writes nothing to it. */
-  function unsupported() {
-    clearTimeout(checkTimer);
+  /** Forget the pedal (unplugged, or connecting again). */
+  function reset() {
+    dev = null;
     ready = false;
-    check = null;
-    status(TEXT.unsupported(lib.MIN_FIRMWARE), false);
-    draw();
   }
 
   function wire(d) {
-    d.on("message", (m, dir) => {
-      if (dir !== "in" || !check || ready) return;
-      check.push(m);
-      const r = check.result();
-      if (r.wrong.length) unsupported();
-      else if (r.ok) supported(d);
+    // another firmware (or no answer): the pedal stays connected, and the library refuses every write to it
+    d.on("checked", (r) => {
+      if (r.ok) supported(d);
+      else status("unsupported"), draw();
     });
     d.on("preset", (p) => {
       stored.set(p.index, p);
@@ -246,19 +238,15 @@ export function mount(root, ctx) {
       afterLiveChange();
     });
     d.on("disconnect", () => {
-      clearTimeout(checkTimer);
-      dev = null;
-      ready = false;
-      check = null;
-      namesSent = false;
-      status(TEXT.unplugged, false);
+      reset();
+      status("unplugged");
       draw();
     });
-    d.on("error", (e) => status(`Pedal error: ${e?.message ?? e}`, false));
+    d.on("error", (e) => status("error", String(e?.message ?? e)));
   }
 
   function adopt(index) {
-    if (index < 1 || index > 200) return;
+    if (index < 1 || index > lib.PRESET_COUNT) return;
     current = index;
     bank = Math.floor((index - 1) / 4) + 1;
     const p = stored.get(index);
@@ -278,13 +266,10 @@ export function mount(root, ctx) {
   /** The expression pedal's target and the value it sets now, for the phone. */
   function reportExp() {
     if (!lib || !exp || exp.MODULE_CTRL === undefined) return;
-    const label = exp.FUN_SWITCH === 1 ? lib.expLabel(exp) : "Off";
-    let value = "";
-    const name = lib.EXP_PARAMS[exp.MODULE_CTRL]?.find((p) => p.id === exp.PARA_CTRL)?.name;
+    const on = exp.FUN_SWITCH === 1;
     const m = modules?.[exp.MODULE_CTRL];
-    const spec = m && lib.model(exp.MODULE_CTRL, m.type)?.params.find((p) => p.name.toUpperCase().replace("FEEDBACK", "F.BACK") === name);
-    if (spec && exp.FUN_SWITCH === 1) value = lib.formatValue(spec, m.values[spec.pos]);
-    report({ exp: { label, value } });
+    const spec = on && m ? lib.expTarget(exp, m.type) : undefined;
+    report({ exp: { label: on ? lib.expLabel(exp) : "Off", value: spec ? lib.formatValue(spec, m.values[spec.pos]) : "" } });
   }
 
   /** A footswitch selected a preset on the pedal: apply the configuration it triggers (E-004). The pedal reports `16`
@@ -299,7 +284,7 @@ export function mount(root, ctx) {
   /** The pedal plugged in (again): connect by itself, as at the start. */
   const onHidConnect = (e) => {
     const d = e.device;
-    if (d?.vendorId === 0x0483 && d?.productId === 0x5703 && !dev && plays()) connect(false);
+    if (lib && d?.vendorId === lib.FILTER.vendorId && d?.productId === lib.FILTER.productId && !dev && plays()) connect(false);
   };
   let hidWatched = false;
 
@@ -311,23 +296,24 @@ export function mount(root, ctx) {
       lastDone = c.n;
       busy = busy.then(() => (c.kind === "select" ? select(c.index) : applyConfig(c.config, false))).catch(() => {});
     }
-    busy = busy.then(() => lastDone && ctx.act(playerSeat(), "done", { n: lastDone }));
+    busy = busy.then(() => {
+      if (lastDone === lastAcked) return;
+      lastAcked = lastDone;
+      ctx.act(playerSeat(), "done", { n: lastDone });
+    });
   }
 
   async function select(index) {
     if (!dev) return;
     await dev.selectPreset(index);
     adopt(index);
-    // the pedal answers a host selection with nothing: ask for the new preset's live state
-    await dev.requestCurrent();
+    // the pedal answers a host selection with nothing: read the new preset's live state, and wait for it
+    await dev.readCurrent();
   }
 
   async function applyConfig(c, fromSwitch) {
     if (!dev) return;
-    if (c.preset && c.preset !== current && !fromSwitch) {
-      await select(c.preset);
-      await new Promise((r) => setTimeout(r, 120));
-    }
+    if (c.preset && c.preset !== current && !fromSwitch) await select(c.preset);
     for (const [k, m] of Object.entries(c.modules)) {
       const slot = Number(k);
       await dev.setModule(slot, m);
@@ -339,7 +325,7 @@ export function mount(root, ctx) {
   // ---- editing on the board --------------------------------------------------------------------------------------
   function setModule(slot, m) {
     modules[slot] = m;
-    draw();
+    drawLive();
     sendNext.set(slot, m);
     if (sendTimers.has(slot)) return;
     const flush = () => {
@@ -381,17 +367,34 @@ export function mount(root, ctx) {
     const ped = view.pedal;
     const L = lib;
     const idx = local ? current || ped.current : ped.current;
-    const names = local && namesSent ? null : ped.names;
+    const names = local && ready ? null : ped.names;
     const nameOf = (i) => (names ? names[i - 1] : stored.get(i)?.name.trim()) || "";
     $(".gp-label").textContent = idx ? (L ? L.presetLabel(idx) : "") : "";
     $(".gp-name").textContent = idx ? `${nameOf(idx) || "—"}${(local ? modifiedNow() : ped.modified) ? " *" : ""}` : "GE150 Pro";
     $(".gp-connect").hidden = !local || !!dev || view.done;
-    $(".gp-save").hidden = !local || !dev || !namesSent || view.done;
+    $(".gp-save").hidden = !local || !dev || !ready || view.done;
     if (!local) $(".gp-conn-text").textContent = ped.connected ? "Pedal connected at the table" : ped.text || "Waiting for the pedal at the table";
     if (!local) $(".gp-dot").dataset.state = ped.connected ? "on" : "off";
+    drawChain();
+    drawEditor();
+    drawPresets(nameOf, idx);
+    drawConfigs();
+    box.classList.toggle("gp-readonly", !canEdit());
+    drawNotice();
+  }
 
+  /** What a fader or a module switch changes: the name's modified mark, the chain and the editor. */
+  function drawLive() {
+    const name = $(".gp-name");
+    name.textContent = name.textContent.replace(/ \*$/, "") + (modifiedNow() ? " *" : "");
+    drawChain();
+    drawEditor();
+  }
+
+  function drawChain() {
+    const L = lib;
     // the chain: from the live modules here, from the view on a remote board
-    const chain = local && modules ? modules : ped.chain;
+    const chain = plays() && modules ? modules : view.pedal.chain;
     const tiles = Array.from({ length: 9 }, (_, s) => {
       const m = chain?.[s];
       const slotName = L?.catalog.slots[s].name ?? "";
@@ -401,15 +404,14 @@ export function mount(root, ctx) {
           <span class="gp-tile-model">${esc(modelName)}</span></button>
         <button class="gp-power" type="button" data-power="${s}" aria-label="${esc(slotName)} on or off" aria-pressed="${!!m?.on}" ${canEdit() ? "" : "disabled"}></button></div>`;
     }).join("");
-    if ($(".gp-chain").dataset.html !== tiles) {
-      $(".gp-chain").dataset.html = tiles;
-      $(".gp-chain").innerHTML = tiles;
-    }
-    drawEditor();
-    drawPresets(nameOf, idx);
-    drawConfigs();
-    box.classList.toggle("gp-readonly", !canEdit());
-    drawNotice();
+    setHtml($(".gp-chain"), tiles);
+  }
+
+  /** Replace an element's content only when it changed (keeps focus and pressed states). */
+  function setHtml(el, markup) {
+    if (el.dataset.html === markup) return;
+    el.dataset.html = markup;
+    el.innerHTML = markup;
   }
 
   function drawEditor() {
@@ -457,10 +459,7 @@ export function mount(root, ctx) {
       return `<button type="button" class="gp-preset ${i === idx ? "on" : ""}" data-index="${i}" ${canEdit() ? "" : "disabled"}>
         <b>${"ABCD"[k]}</b><span>${esc(nameOf(i) || "")}</span></button>`;
     }).join("");
-    if ($(".gp-abcd").dataset.html !== btns) {
-      $(".gp-abcd").dataset.html = btns;
-      $(".gp-abcd").innerHTML = btns;
-    }
+    setHtml($(".gp-abcd"), btns);
     $(".gp-presets").hidden = tab !== "presets";
     $(".gp-configs").hidden = tab !== "configs";
     box.querySelectorAll(".gp-tab").forEach((t) => t.classList.toggle("on", t.dataset.tab === tab));
@@ -478,10 +477,7 @@ export function mount(root, ctx) {
         <button type="button" class="gp-btn gp-delete" data-id="${esc(c.id)}" aria-label="Delete ${esc(c.name)}" ${plays() && !view.done ? "" : "disabled"}>✕</button></div>`;
     }).join("");
     const list = rows || `<div class="gp-empty muted">No configurations yet. Shape the sound, then Save configuration… to put it on a quick slot of the phone or on a footswitch.</div>`;
-    if ($(".gp-config-list").dataset.html !== list) {
-      $(".gp-config-list").dataset.html = list;
-      $(".gp-config-list").innerHTML = list;
-    }
+    setHtml($(".gp-config-list"), list);
   }
 
   // ---- sheets ----------------------------------------------------------------------------------------------------
@@ -541,7 +537,8 @@ export function mount(root, ctx) {
     const base = stored.get(current);
     const changed = modules.map((m, s) => !base || !sameModule(m, base.modules[s]));
     const pick = new Set(changed.some(Boolean) ? changed.flatMap((c, s) => (c ? [s] : [])) : modules.flatMap((m, s) => (m.on ? [s] : [])));
-    let slot = [0, 1, 2, 3, 4, 5, 6, 7].find((q) => !view.configs.some((c) => c.slot === q)) ?? null;
+    const quick = Array.from({ length: view.quickSlots }, (_, q) => q);
+    let slot = quick.find((q) => !view.configs.some((c) => c.slot === q)) ?? null;
     let trigger = false, withPreset = false;
     const used = (q) => view.configs.find((c) => c.slot === q)?.name;
     const render = () => `<div class="gp-sheet-head"><div class="gp-sheet-title">Save a configuration</div>
@@ -550,7 +547,7 @@ export function mount(root, ctx) {
         ${modules.map((m, s) => `<button type="button" class="gp-chip ${pick.has(s) ? "on" : ""}" data-mod="${s}">${esc(L.catalog.slots[s].name)}${changed[s] ? " •" : ""}</button>`).join("")}</div></div>
       <div class="gp-cap-row"><div class="gp-cap-label">Quick slot on the phone</div><div class="gp-cap-mods">
         <button type="button" class="gp-chip ${slot === null ? "on" : ""}" data-slot="-1">None</button>
-        ${[0, 1, 2, 3, 4, 5, 6, 7].map((q) => `<button type="button" class="gp-chip ${slot === q ? "on" : ""}" data-slot="${q}">${q + 1}${used(q) ? " ↺" : ""}</button>`).join("")}</div></div>
+        ${quick.map((q) => `<button type="button" class="gp-chip ${slot === q ? "on" : ""}" data-slot="${q}">${q + 1}${used(q) ? " ↺" : ""}</button>`).join("")}</div></div>
       <div class="gp-cap-row"><div class="gp-cap-label">Options</div><div class="gp-cap-mods">
         <button type="button" class="gp-chip ${withPreset ? "on" : ""}" data-opt="preset">Select ${esc(L.presetLabel(current))} first</button>
         <button type="button" class="gp-chip ${trigger ? "on" : ""}" data-opt="trigger">Apply when ${esc(L.presetLabel(current))} is chosen with the footswitch</button></div></div>
@@ -630,8 +627,7 @@ export function mount(root, ctx) {
   const faders = $(".gp-faders");
   /** One drag per finger (pointerId → fader), so two faders move at once on a multitouch screen. */
   const drags = new Map();
-  const valueAt = (track, y, p) => {
-    const r = track.getBoundingClientRect();
+  const valueAt = (r, y, p) => {
     const f = Math.min(1, Math.max(0, (r.bottom - y) / r.height));
     const [lo, hi] = lib.rawRange(p);
     return Math.round(lo + f * (hi - lo));
@@ -644,11 +640,11 @@ export function mount(root, ctx) {
     values[p.pos] = Math.min(hi, Math.max(lo, raw));
     if (values[p.pos] !== modules[selected].values[p.pos]) setModule(selected, { ...modules[selected], values });
   };
-  const follow = (d, y) => setParam(d.i, valueAt(d.track, y, lib.model(selected, modules[selected].type).params[d.i]));
+  const follow = (d, y) => setParam(d.i, valueAt(d.rect, y, lib.model(selected, modules[selected].type).params[d.i]));
   faders.addEventListener("pointerdown", (e) => {
     const track = e.target.closest(".gp-f-track");
     if (!track || !canEdit()) return;
-    const d = { i: Number(track.dataset.i), track };
+    const d = { i: Number(track.dataset.i), rect: track.getBoundingClientRect() };
     drags.set(e.pointerId, d);
     track.setPointerCapture(e.pointerId);
     follow(d, e.clientY);
@@ -670,11 +666,6 @@ export function mount(root, ctx) {
 
   // ---- the table's click track (E-005) ---------------------------------------------------------------------------
   let audio = null, clickTimer = null, nextAt = 0, beat = 0, clickRun = -1;
-  function clickTempo() {
-    const c = view?.click;
-    if (!c) return 100;
-    return c.follow && rhythm?.bpm ? rhythm.bpm : c.bpm;
-  }
   function tickClick() {
     const c = view?.click;
     if (!audio || !c?.on) return;
@@ -691,7 +682,7 @@ export function mount(root, ctx) {
         o.stop(nextAt + 0.06);
       }
       beat++;
-      nextAt += 60 / clickTempo();
+      nextAt += 60 / view.tempo;
     }
   }
   function syncClick() {
@@ -701,8 +692,8 @@ export function mount(root, ctx) {
       if (clickTimer) clearInterval(clickTimer), (clickTimer = null);
       return;
     }
-    audio ??= new AudioContext();
-    if (audio.state === "suspended") audio.resume().catch(() => {});
+    audio = sharedAudio();
+    if (!audio) return;
     if (c.run !== clickRun || !clickTimer) {
       clickRun = c.run;
       beat = 0;
@@ -713,18 +704,14 @@ export function mount(root, ctx) {
 
   const inst = {
     reconnect() {
-      if (dev) dev.close().catch(() => {});
-      clearTimeout(checkTimer);
-      dev = null;
-      ready = false;
-      check = null;
-      namesSent = false;
+      dev?.close().catch(() => {});
+      reset();
       connect(true);
     },
     update(v, _events, i) {
       view = v;
       info = i;
-      seatPlates(root, info).classList.toggle("gp-plates-north", info.rotation === 180);
+      seatPlates(root, info).classList.toggle("gp-north", info.rotation === 180);
       box.classList.toggle("gp-north", info.rotation === 180);
       const local = plays();
       box.classList.toggle("gp-remote", !local);
@@ -752,10 +739,8 @@ export function mount(root, ctx) {
       dead = true;
       if (live === inst) live = null;
       clearTimeout(reportTimer);
-      clearTimeout(checkTimer);
       if (hidWatched) navigator.hid?.removeEventListener("connect", onHidConnect);
       if (clickTimer) clearInterval(clickTimer);
-      audio?.close().catch(() => {});
       dev?.close().catch(() => {});
       box.remove();
     },
