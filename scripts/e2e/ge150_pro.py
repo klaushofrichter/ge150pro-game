@@ -118,6 +118,19 @@ def main():
             wait(lambda: sent(board, 0x83) > before, 5, "the footswitch to apply the configuration")
             wait(lambda: "Preset 5" in deck.locator(".gd-name").inner_text(), 5, "the phone to follow the footswitch")
 
+            # A damaged transfer (a bad CRC, then the same report intact): the configuration is applied all the same,
+            # and the phone still sees a connected pedal (a passing note on the board, not "not connected").
+            board.evaluate("() => window.__pedal.press(6)")
+            time.sleep(0.3)
+            before = sent(board, 0x83)
+            board.evaluate("() => window.__pedal.pressGarbled(5)")
+            wait(lambda: sent(board, 0x83) > before, 5, "the footswitch to apply the configuration after a damaged report")
+            wait(lambda: "bad CRC" in board.locator(".gp-conn-text").inner_text(), 5, "the board to note the damaged report")
+            deck.locator(".gd-tab[data-tab=setup]").click()
+            status = deck.locator(".gd-status-text").inner_text()
+            assert status.startswith("Connected"), f"the phone still sees a connected pedal: {status}"
+            deck.locator(".gd-tab[data-tab=play]").click()
+
             # Rhythm: the pedal's drum machine by name, and the table's click.
             deck.locator(".gd-tab[data-tab=rhythm]").click()
             wait(lambda: "8 BEAT 4" in deck.locator(".gd-pr-style").inner_text(), 5, "the drum machine's style on the phone")

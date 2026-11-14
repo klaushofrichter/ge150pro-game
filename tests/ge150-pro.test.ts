@@ -140,6 +140,30 @@ describe("GE150 Pro", () => {
     expect((rt.state as any).stats).toMatchObject({ switched: 2, applied: 1 });
   });
 
+  it("edits a configuration field by field: a field left out stays, null clears it, a bad slot is refused", () => {
+    const { rt } = connected();
+    rt.submit(0, { name: "capture", payload: { config: config("a", { slot: 2, trigger: 5 }) } }, "board");
+    const cfg = () => (rt.state as any).configs.find((c: any) => c.id === "a");
+    expect(rt.submit(0, { name: "edit", payload: { id: "a", name: "Solo" } }, "human")).toEqual({ ok: true });
+    expect(cfg()).toMatchObject({ name: "Solo", slot: 2, trigger: 5 });
+    expect(rt.submit(0, { name: "edit", payload: { id: "a", slot: null } }, "human")).toEqual({ ok: true });
+    expect(cfg()).toMatchObject({ slot: null, trigger: 5 });
+    for (const payload of [{ id: "a", slot: 8 }, { id: "a", trigger: 0 }, { id: "a", slot: "2" }]) {
+      expect(rt.submit(0, { name: "edit", payload }, "human"), JSON.stringify(payload)).toMatchObject({ ok: false });
+    }
+    expect(cfg()).toMatchObject({ name: "Solo", slot: null, trigger: 5 });
+  });
+
+  it("starts the click while following a drum machine outside the click's own range", () => {
+    const { rt } = connected();
+    rt.submit(0, { name: "pedal", payload: { rhythm: { playing: true, mode: 0, style: 1, volume: 5, bpm: 320 } } }, "board");
+    rt.submit(0, { name: "click", payload: { follow: true } }, "human");
+    expect((rt.boardView() as any).tempo).toBe(320);
+    // what the phone's Start sends while following: no tempo of its own
+    expect(rt.submit(0, { name: "click", payload: { on: true } }, "human")).toEqual({ ok: true });
+    expect((rt.boardView() as any)).toMatchObject({ click: { on: true, follow: true }, tempo: 320 });
+  });
+
   it("runs the table's click: start counts a run, tempo and beats in range", () => {
     const { rt } = connected();
     expect(rt.submit(0, { name: "click", payload: { on: true, bpm: 96, beats: 3, follow: false } }, "human")).toEqual({ ok: true });
