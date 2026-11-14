@@ -29,6 +29,15 @@ describe("GE150 Pro", () => {
     expect(rt.view(0)).toEqual(rt.boardView());
   });
 
+  it("labels each configuration the same way for the board and the phone", () => {
+    const { rt } = connected();
+    rt.submit(0, { name: "configs", payload: { list: [config("a", { slot: 2, trigger: 5, preset: 7 }), config("b")] } }, "human");
+    const configs = (rt.boardView() as any).configs;
+    expect(configs.find((c: any) => c.id === "a").tags).toEqual(["Quick 3", "Footswitch 2A", "on 2C"]);
+    expect(configs.find((c: any) => c.id === "b").tags).toEqual([]);
+    expect(rt.view(0)).toEqual(rt.boardView());
+  });
+
   it("counts presets and modules as the library does (the rules keep their own copy of the numbers)", () => {
     // the board sends what the library decodes: a list of PRESET_COUNT names and a chain of SLOT_COUNT modules
     const { rt } = connected();
@@ -153,7 +162,7 @@ describe("GE150 Pro", () => {
     expect(rt.submit(0, { name: "finish", payload: {} }, "human")).toEqual({ ok: true });
     expect(rt.over).toBe(true);
     const over = game.def.isOver(rt.state) as any;
-    expect(over.text).toBe("Ann played for five minutes and recalled two configurations from the phone, saved one new configuration.");
+    expect(over.text).toBe("Ann played for five minutes and recalled two configurations from the phone and saved one new configuration.");
     expect((rt.boardView() as any).click.on).toBe(false);
     expect(replaysExactly(game, rt)).toBe(true);
   });

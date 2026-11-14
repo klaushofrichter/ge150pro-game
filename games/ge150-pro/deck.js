@@ -75,6 +75,12 @@ export function mount(root, ctx) {
     draw();
   });
 
+  /** Replace an element's content only when it changed (keeps a pressed button pressed). */
+  const setHtml = (el, markup) => {
+    if (el.dataset.html === markup) return;
+    el.dataset.html = markup;
+    el.innerHTML = markup;
+  };
   const label = (i) => (lib && i ? lib.presetLabel(i) : i ? String(i) : "");
   const send = (name, payload) => (view && !view.done ? ctx.send(name, payload) : null);
 
@@ -97,10 +103,7 @@ export function mount(root, ctx) {
       return `<button type="button" class="gd-slot ${c ? "" : "empty"}" data-id="${c ? esc(c.id) : ""}" ${c && live ? "" : "disabled"}>
         <span>${q + 1}</span><b>${c ? esc(c.name) : "—"}</b></button>`;
     }).join("");
-    if ($(".gd-slots").dataset.html !== slots) {
-      $(".gd-slots").dataset.html = slots;
-      $(".gd-slots").innerHTML = slots;
-    }
+    setHtml($(".gd-slots"), slots);
     $(".gd-exp").textContent = p.exp ? `EXP: ${p.exp.label}${p.exp.value ? ` · ${p.exp.value}` : ""}` : "";
     // Rhythm: the pedal's
     const r = p.rhythm;
@@ -119,15 +122,12 @@ export function mount(root, ctx) {
     // Pedal
     $(".gd-status-text").textContent = view.done ? "Done" : p.connected ? `Connected · preset ${label(p.current)}` : p.text || "Not connected: tap Connect pedal on the board";
     const rows = view.configs.map((x) => {
-      const tags = [x.slot !== null ? `Quick ${x.slot + 1}` : "", x.trigger ? `Footswitch ${label(x.trigger)}` : ""].filter(Boolean).join(" · ");
+      const tags = (x.tags ?? []).join(" · ");
       return `<div class="gd-config"><div class="gd-config-text"><b>${esc(x.name)}</b><span class="muted">${esc(tags || "not on a slot")}</span></div>
         <button type="button" class="gd-rename" data-id="${esc(x.id)}" ${view.done ? "disabled" : ""}>Rename</button>
         <button type="button" class="gd-delete" data-id="${esc(x.id)}" aria-label="Delete ${esc(x.name)}" ${view.done ? "disabled" : ""}>✕</button></div>`;
     }).join("") || `<div class="muted gd-empty">No configurations yet: save one on the board.</div>`;
-    if ($(".gd-list").dataset.html !== rows) {
-      $(".gd-list").dataset.html = rows;
-      $(".gd-list").innerHTML = rows;
-    }
+    setHtml($(".gd-list"), rows);
     $(".gd-finish").disabled = view.done;
   }
 

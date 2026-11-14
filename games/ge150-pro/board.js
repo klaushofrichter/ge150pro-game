@@ -65,7 +65,7 @@ export function mount(root, ctx) {
           <button class="gp-btn primary gp-notice-connect" type="button" hidden>Connect pedal</button>
           <div class="gp-req"><div class="gp-eyebrow">Requires</div>
             <div class="gp-req-row"><b>Device</b><span>Mooer GE150 Pro, connected to this table by USB</span></div>
-            <div class="gp-req-row"><b>Firmware</b><span class="gp-req-fw"></span></div>
+            <div class="gp-req-row"><b>Firmware</b><span class="gp-req-fw">${MIN_FIRMWARE} or newer</span></div>
             <div class="gp-req-note muted">The pedal does not tell its firmware version over USB, so the board checks how it
               answers. Update an older pedal with Mooer's GE150 Pro editor.</div></div></div>
       </section>
@@ -112,14 +112,19 @@ export function mount(root, ctx) {
   const plays = () => !!info && !!view && info.controlSeats?.includes(view.seat);
 
   // ---- reports to the rules -------------------------------------------------------------------------------------
+  /** What the last reports said, field by field (JSON), so unchanged fields are not sent again. */
+  let sent = {};
   function report(patch) {
     if (!plays() || view?.done) return;
     if (!ready && !("connected" in patch)) return; // nothing about an unchecked pedal reaches the table
     Object.assign(pending, patch);
     reportTimer ??= setTimeout(() => {
       reportTimer = null;
-      const p = pending;
+      // only what changed since the last report: the rules would drop the rest, after a round trip
+      const p = Object.fromEntries(Object.entries(pending).filter(([k, v]) => JSON.stringify(v) !== sent[k]));
       pending = {};
+      if (!Object.keys(p).length) return;
+      for (const [k, v] of Object.entries(p)) sent[k] = JSON.stringify(v);
       ctx.act(playerSeat(), "pedal", p);
     }, REPORT_MS);
   }
@@ -135,11 +140,11 @@ export function mount(root, ctx) {
 
   async function connect(fromTouch) {
     if (!plays() || dev || opening || dead) return;
-    const L = await loadLib();
+    await loadLib();
     if (!navigator.hid) return status("noHid");
     opening = true;
     try {
-      const d = fromTouch ? await L.GE150Pro.request() : await L.GE150Pro.previouslyGranted();
+      const d = fromTouch ? await lib.GE150Pro.request() : await lib.GE150Pro.previouslyGranted();
       if (!d) {
         status(fromTouch ? "notChosen" : "noPedal");
         return;
@@ -184,7 +189,6 @@ export function mount(root, ctx) {
     if (!show) return;
     const st = STATES[state.key];
     $(".gp-notice-title").textContent = st.title;
-    $(".gp-req-fw").textContent = `${MIN_FIRMWARE} or newer`;
     $(".gp-notice-text").textContent = state.detail || st.text;
     $(".gp-notice-connect").hidden = !st.retry;
   }
@@ -206,6 +210,8 @@ export function mount(root, ctx) {
   function reset() {
     dev = null;
     ready = false;
+    dropEdits();
+    sent = {}; // a new connection reports everything again
   }
 
   function wire(d) {
@@ -317,9 +323,7 @@ export function mount(root, ctx) {
     // the board switches first, so edits made while the pedal loads the preset belong to the new preset, which is
     // where the device queue delivers them
     adopt(index);
-    await dev.selectPreset(index);
-    // the pedal answers a host selection with nothing: read the new preset's live state, and wait for it
-    await dev.readCurrent();
+    await dev.selectAndRead(index);
   }
 
   async function applyConfig(c, fromSwitch) {
@@ -383,12 +387,11 @@ export function mount(root, ctx) {
     if (!view || !info) return;
     const local = plays();
     const ped = view.pedal;
-    const L = lib;
     const idx = local ? current || ped.current : ped.current;
     const names = local && ready ? null : ped.names;
     const nameOf = (i) => (names ? names[i - 1] : stored.get(i)?.name.trim()) || "";
-    $(".gp-label").textContent = idx ? (L ? L.presetLabel(idx) : "") : "";
-    $(".gp-name").textContent = idx ? `${nameOf(idx) || "—"}${(local ? modifiedNow() : ped.modified) ? " *" : ""}` : "GE150 Pro";
+    $(".gp-label").textContent = idx ? (lib ? lib.presetLabel(idx) : "") : "";
+    drawName(idx ? nameOf(idx) || "—" : null, local ? modifiedNow() : ped.modified);
     $(".gp-connect").hidden = !local || !!dev || view.done;
     $(".gp-save").hidden = !local || !dev || !ready || view.done;
     if (!local) $(".gp-conn-text").textContent = ped.connected ? "Pedal connected at the table" : ped.text || "Waiting for the pedal at the table";
@@ -401,22 +404,28 @@ export function mount(root, ctx) {
     drawNotice();
   }
 
+  /** The preset's name with its modified mark ("GE150 Pro" before a preset is known). */
+  let shownName = null;
+  function drawName(name, modified) {
+    shownName = name;
+    $(".gp-name").textContent = name === null ? "GE150 Pro" : `${name}${modified ? " *" : ""}`;
+  }
+
   /** What a fader or a module switch changes: the name's modified mark, the chain and the editor. */
   function drawLive() {
-    const name = $(".gp-name");
-    name.textContent = name.textContent.replace(/ \*$/, "") + (modifiedNow() ? " *" : "");
+    drawName(shownName, modifiedNow());
     drawChain();
     drawEditor();
   }
 
   function drawChain() {
-    const L = lib;
     // the chain: from the live modules here, from the view on a remote board
     const chain = plays() && modules ? modules : view.pedal.chain;
-    const tiles = Array.from({ length: L?.SLOT_COUNT ?? 9 }, (_, s) => {
+    if (!lib) return; // the chain's names come from the library
+    const tiles = Array.from({ length: lib.SLOT_COUNT }, (_, s) => {
       const m = chain?.[s];
-      const slotName = L?.catalog.slots[s].name ?? "";
-      const modelName = m && L ? L.model(s, m.type)?.name ?? `model ${m.type + 1}` : "";
+      const slotName = lib?.catalog.slots[s].name ?? "";
+      const modelName = m && lib ? lib.model(s, m.type)?.name ?? `model ${m.type + 1}` : "";
       return `<div class="gp-tile ${m?.on ? "on" : ""} ${s === selected ? "sel" : ""}" role="listitem" data-slot="${s}">
         <button class="gp-tile-body" type="button" data-slot="${s}"><span class="gp-tile-slot">${esc(slotName)}</span>
           <span class="gp-tile-model">${esc(modelName)}</span></button>
@@ -433,11 +442,10 @@ export function mount(root, ctx) {
   }
 
   function drawEditor() {
-    const L = lib;
     const m = modules?.[selected];
-    const slotName = L?.catalog.slots[selected].name ?? "";
+    const slotName = lib?.catalog.slots[selected].name ?? "";
     $(".gp-ed-slot").textContent = slotName;
-    const mm = m && L ? L.model(selected, m.type) : null;
+    const mm = m && lib ? lib.model(selected, m.type) : null;
     $(".gp-model").textContent = mm ? `${String(m.type + 1).padStart(2, "0")}  ${mm.name}` : "—";
     $(".gp-model").disabled = !canEdit();
     const pw = $(".gp-ed-power");
@@ -463,8 +471,8 @@ export function mount(root, ctx) {
     mm.params.forEach((p, i) => {
       const el = faders.querySelector(`.gp-fader[data-i="${i}"]`);
       const raw = m.values[p.pos];
-      const f = L.rawFraction(p, raw);
-      el.querySelector(".gp-f-value").textContent = L.formatValue(p, raw);
+      const f = lib.rawFraction(p, raw);
+      el.querySelector(".gp-f-value").textContent = lib.formatValue(p, raw);
       el.querySelector(".gp-f-fill").style.height = `${f * 100}%`;
       el.querySelector(".gp-f-knob").style.bottom = `calc(${f * 100}% - 14px)`; // (the track's margin keeps it off the name)
     });
@@ -484,11 +492,10 @@ export function mount(root, ctx) {
   }
 
   function drawConfigs() {
-    const L = lib;
     $(".gp-capture").disabled = !canEdit();
     const rows = (view.configs ?? []).map((c) => {
-      const what = Object.keys(c.modules).map((k) => L?.catalog.slots[Number(k)].name ?? k).join(", ");
-      const tags = [c.slot !== null ? `Quick ${c.slot + 1}` : "", c.trigger ? `Footswitch ${L ? L.presetLabel(c.trigger) : c.trigger}` : "", c.preset && L ? `on ${L.presetLabel(c.preset)}` : ""].filter(Boolean);
+      const what = Object.keys(c.modules).map((k) => lib?.catalog.slots[Number(k)].name ?? k).join(", ");
+      const tags = c.tags ?? [];
       return `<div class="gp-config"><div class="gp-config-text"><b>${esc(c.name)}</b><span class="muted">${esc(what || "preset only")}</span>
           <span class="gp-tags">${tags.map((t) => `<i>${esc(t)}</i>`).join("")}</span></div>
         <button type="button" class="gp-btn gp-apply" data-id="${esc(c.id)}" ${canEdit() ? "" : "disabled"}>Apply</button>
@@ -509,10 +516,9 @@ export function mount(root, ctx) {
 
   function openModels() {
     if (!canEdit()) return;
-    const L = lib;
-    const models = L.catalog.slots[selected].models;
+    const models = lib.catalog.slots[selected].models;
     openSheet(
-      `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(L.catalog.slots[selected].name)}: choose a model</div>
+      `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(lib.catalog.slots[selected].name)}: choose a model</div>
         <button type="button" class="gp-btn gp-close">Close</button></div>
       <div class="gp-models">${models.map((m) => `<button type="button" class="gp-model-card ${m.index === modules[selected].type ? "on" : ""}" data-type="${m.index}">
         <span>${String(m.index + 1).padStart(2, "0")}</span><b>${esc(m.name)}</b></button>`).join("")}</div>`,
@@ -530,8 +536,7 @@ export function mount(root, ctx) {
 
   function openSave() {
     if (!canEdit()) return;
-    const L = lib;
-    const label = L.presetLabel(current);
+    const label = lib.presetLabel(current);
     openSheet(
       `<div class="gp-sheet-head"><div class="gp-sheet-title">Save to ${esc(label)}?</div></div>
       <p class="gp-sheet-text">This overwrites the preset stored in slot ${esc(label)} on the pedal with the sound it plays now.
@@ -551,7 +556,6 @@ export function mount(root, ctx) {
 
   function openCapture() {
     if (!canEdit()) return;
-    const L = lib;
     const base = stored.get(current);
     const changed = modules.map((m, s) => !base || !sameModule(m, base.modules[s]));
     const pick = new Set(changed.some(Boolean) ? changed.flatMap((c, s) => (c ? [s] : [])) : modules.flatMap((m, s) => (m.on ? [s] : [])));
@@ -562,13 +566,13 @@ export function mount(root, ctx) {
     const render = () => `<div class="gp-sheet-head"><div class="gp-sheet-title">Save a configuration</div>
         <button type="button" class="gp-btn gp-close">Cancel</button></div>
       <div class="gp-cap-row"><div class="gp-cap-label">Modules it sets</div><div class="gp-cap-mods">
-        ${modules.map((m, s) => `<button type="button" class="gp-chip ${pick.has(s) ? "on" : ""}" data-mod="${s}">${esc(L.catalog.slots[s].name)}${changed[s] ? " •" : ""}</button>`).join("")}</div></div>
+        ${modules.map((m, s) => `<button type="button" class="gp-chip ${pick.has(s) ? "on" : ""}" data-mod="${s}">${esc(lib.catalog.slots[s].name)}${changed[s] ? " •" : ""}</button>`).join("")}</div></div>
       <div class="gp-cap-row"><div class="gp-cap-label">Quick slot on the phone</div><div class="gp-cap-mods">
         <button type="button" class="gp-chip ${slot === null ? "on" : ""}" data-slot="-1">None</button>
         ${quick.map((q) => `<button type="button" class="gp-chip ${slot === q ? "on" : ""}" data-slot="${q}">${q + 1}${used(q) ? " ↺" : ""}</button>`).join("")}</div></div>
       <div class="gp-cap-row"><div class="gp-cap-label">Options</div><div class="gp-cap-mods">
-        <button type="button" class="gp-chip ${withPreset ? "on" : ""}" data-opt="preset">Select ${esc(L.presetLabel(current))} first</button>
-        <button type="button" class="gp-chip ${trigger ? "on" : ""}" data-opt="trigger">Apply when ${esc(L.presetLabel(current))} is chosen with the footswitch</button></div></div>
+        <button type="button" class="gp-chip ${withPreset ? "on" : ""}" data-opt="preset">Select ${esc(lib.presetLabel(current))} first</button>
+        <button type="button" class="gp-chip ${trigger ? "on" : ""}" data-opt="trigger">Apply when ${esc(lib.presetLabel(current))} is chosen with the footswitch</button></div></div>
       <p class="gp-sheet-text muted">• changed from the stored preset. ↺ the slot is taken; this configuration replaces it there.
         The name can be changed on the phone.</p>
       <div class="gp-sheet-btns"><button type="button" class="gp-btn primary gp-yes" ${pick.size || withPreset ? "" : "disabled"}>Save configuration</button></div>`;
@@ -583,8 +587,8 @@ export function mount(root, ctx) {
         else if (b.dataset.opt === "trigger") trigger = !trigger;
         else if (b.classList.contains("gp-yes")) {
           const n = (view.configs?.length ?? 0) + 1;
-          const names = [...pick].map((s) => L.catalog.slots[s].name.split("/")[0]);
-          const name = `${names.slice(0, 2).join("+") || "Preset"}${names.length > 2 ? "+…" : ""} ${L.presetLabel(current)}`.slice(0, 24);
+          const names = [...pick].map((s) => lib.catalog.slots[s].name.split("/")[0]);
+          const name = `${names.slice(0, 2).join("+") || "Preset"}${names.length > 2 ? "+…" : ""} ${lib.presetLabel(current)}`.slice(0, 24);
           const config = {
             id: `c${Date.now().toString(36)}${n}`,
             name,

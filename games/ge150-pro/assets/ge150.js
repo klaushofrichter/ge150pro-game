@@ -485,6 +485,14 @@ var GE150Pro = class _GE150Pro {
     }
   }
   /** Resolves once the pedal has loaded the preset (see SELECT_SETTLE_MS). */
+  /**
+   * Select a preset and wait until its live state has been read back: the pedal answers a host selection with
+   * nothing, so this asks (B0) once it has loaded the preset.
+   */
+  async selectAndRead(index) {
+    await this.selectPreset(index);
+    await this.readCurrent();
+  }
   selectPreset(index) {
     if (index < 1 || index > PRESET_COUNT) return Promise.reject(new RangeError(`preset ${index}`));
     return this.write(selectPreset(index));
