@@ -3,7 +3,7 @@
 // the pedal's state as the board reports it, the player's configurations (kept on their phone between games), the
 // commands the phone asks the board to carry out, and the table's click track. No chance and no secrets: every view
 // is the same.
-import { count, defineGame, type GameContext, type SeatInfo, type StepDescription, type StepInfo } from "@game-table/sdk";
+import { count, defineGame, list, type GameContext, type SeatInfo, type StepDescription, type StepInfo } from "@game-table/sdk";
 
 /** One effect module as the pedal stores it: switch, model (0-based) and ten raw values. */
 export interface ModuleSnap {
@@ -96,10 +96,13 @@ const ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max) : "");
 const int = (v: unknown, lo: number, hi: number): number | null =>
   typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi ? v : null;
-const optInt = (v: unknown, lo: number, hi: number): number | null | undefined => (v === null ? null : v === undefined ? undefined : int(v, lo, hi) ?? undefined);
 /** An optional field: null when absent, the number when valid, false when present but invalid. */
 const nullable = (v: unknown, lo: number, hi: number): number | null | false => (v === null || v === undefined ? null : int(v, lo, hi) ?? false);
 
+/**
+ * "2A" for preset 5. The library has the same function (src/ge150/preset.ts); the rules keep their own copy because a
+ * table installs only the game's folder. tests/ge150-pro.test.ts keeps the two equal.
+ */
 export function presetLabel(index: number): string {
   const i = index - 1;
   return `${Math.floor(i / 4) + 1}${"ABCD"[i % 4]}`;
@@ -189,13 +192,22 @@ function pedalPatch(state: State, p: Record<string, unknown>): Pedal | { reject:
   return next;
 }
 
+/** How a configuration is labelled on the board and the phone: "Quick 3", "Footswitch 2A", "on 5B". */
+function configTags(c: Config): string[] {
+  return [
+    c.slot !== null ? `Quick ${c.slot + 1}` : "",
+    c.trigger !== null ? `Footswitch ${presetLabel(c.trigger)}` : "",
+    c.preset !== null ? `on ${presetLabel(c.preset)}` : "",
+  ].filter(Boolean);
+}
+
 function view(s: State) {
   return {
     seat: s.seat,
     player: s.player,
     done: s.done,
     pedal: s.pedal,
-    configs: s.configs,
+    configs: s.configs.map((c) => ({ ...c, tags: configTags(c) })),
     synced: s.synced,
     commands: s.commands,
     click: s.click,
@@ -292,9 +304,11 @@ export default defineGame<State>({
         const c = state.configs.find((x) => x.id === id);
         if (!c) return { reject: "That configuration is gone" };
         if (p.remove === true) return { state: { ...state, configs: state.configs.filter((x) => x.id !== id) } };
-        const slot = optInt(p.slot, 0, QUICK_SLOTS - 1), trigger = optInt(p.trigger, 1, PRESETS);
-        if (("slot" in p && slot === undefined) || ("trigger" in p && trigger === undefined)) return { reject: "That slot does not exist" };
-        const next: Config = { ...c, name: "name" in p ? text(p.name, 24) || c.name : c.name, slot: slot === undefined ? c.slot : slot, trigger: trigger === undefined ? c.trigger : trigger };
+        // a field left out keeps its value; null clears it
+        const slot = "slot" in p ? nullable(p.slot, 0, QUICK_SLOTS - 1) : c.slot;
+        const trigger = "trigger" in p ? nullable(p.trigger, 1, PRESETS) : c.trigger;
+        if (slot === false || trigger === false) return { reject: "That slot does not exist" };
+        const next: Config = { ...c, name: "name" in p ? text(p.name, 24) || c.name : c.name, slot, trigger };
         return { state: { ...state, configs: settle(state.configs, next) } };
       }
       case "apply": {
@@ -355,15 +369,15 @@ export default defineGame<State>({
       captured ? `saved ${count(captured, "new configuration")}` : "",
     ].filter(Boolean);
     return {
-      text: `${state.player || "The player"} played${m ? ` for ${count(m, "minute")}` : ""}${parts.length ? ` and ${parts.join(", ")}` : ""}.`,
+      text: `${state.player || "The player"} played${m ? ` for ${count(m, "minute")}` : ""}${parts.length ? ` and ${list(parts)}` : ""}.`,
       highlights: { minutes: m, recalls, applied, switched, captured },
       table: { columns: ["Player", "Recalls", "Footswitch", "Minutes"], rows: [[state.player, recalls, switched, m]] },
     };
   },
 
   onSeatChanged(state, seat) {
-    // another person: their phone brings their own configurations
-    return { state: { ...state, player: seat.name, configs: [], synced: false } };
+    // another person: their phone brings their own configurations; the last player's queued commands and counts end
+    return { state: { ...state, player: seat.name, configs: [], synced: false, commands: [], stats: { recalls: 0, applied: 0, switched: 0, captured: 0 } } };
   },
 
   describe: describeStep,

@@ -3,11 +3,12 @@
 // a player exchanged mid-game.
 import { describe, expect, it } from "vitest";
 import { loadGame, replaysExactly, seats, start } from "./harness.ts";
+import { PRESET_COUNT, SLOT_COUNT } from "../src/ge150/preset.ts";
 
 const game = await loadGame("ge150-pro");
 const one = () => ({ seats: seats(1) });
-const names = Array.from({ length: 200 }, (_, i) => `Preset ${i + 1}`);
-const chain = Array.from({ length: 9 }, (_, s) => ({ on: s % 2 === 0, type: s }));
+const names = Array.from({ length: PRESET_COUNT }, (_, i) => `Preset ${i + 1}`);
+const chain = Array.from({ length: SLOT_COUNT }, (_, s) => ({ on: s % 2 === 0, type: s }));
 const snap = (on: boolean, type: number, first = 50) => ({ on, type, values: [first, 50, 50, 0, 0, 0, 0, 0, 0, 0] });
 const config = (id: string, extra: Record<string, unknown> = {}) => ({ id, name: `Config ${id}`, slot: null, trigger: null, preset: null, modules: { "2": snap(true, 6, 77) }, ...extra });
 const wait = (clock: { setTimeout(fn: () => void, ms: number): unknown; advance(): boolean }, ms: number) => {
@@ -26,6 +27,24 @@ describe("GE150 Pro", () => {
     const { rt } = start(game, 1, {}, 1, one());
     expect(rt.boardView()).toMatchObject({ seat: 0, done: false, pedal: { connected: false, current: 0 }, configs: [], commands: [] });
     expect(rt.view(0)).toEqual(rt.boardView());
+  });
+
+  it("labels each configuration the same way for the board and the phone", () => {
+    const { rt } = connected();
+    rt.submit(0, { name: "configs", payload: { list: [config("a", { slot: 2, trigger: 5, preset: 7 }), config("b")] } }, "human");
+    const configs = (rt.boardView() as any).configs;
+    expect(configs.find((c: any) => c.id === "a").tags).toEqual(["Quick 3", "Footswitch 2A", "on 2C"]);
+    expect(configs.find((c: any) => c.id === "b").tags).toEqual([]);
+    expect(rt.view(0)).toEqual(rt.boardView());
+  });
+
+  it("counts presets and modules as the library does (the rules keep their own copy of the numbers)", () => {
+    // the board sends what the library decodes: a list of PRESET_COUNT names and a chain of SLOT_COUNT modules
+    const { rt } = connected();
+    expect((rt.boardView() as any).pedal.names).toHaveLength(PRESET_COUNT);
+    expect((rt.boardView() as any).pedal.chain).toHaveLength(SLOT_COUNT);
+    expect(rt.submit(0, { name: "pedal", payload: { names: [...names, "one more"] } }, "board")).toMatchObject({ ok: false });
+    expect(rt.submit(0, { name: "pedal", payload: { chain: chain.slice(1) } }, "board")).toMatchObject({ ok: false });
   });
 
   it("takes the board's reports about the pedal, field by field, and refuses broken ones", () => {
@@ -143,7 +162,7 @@ describe("GE150 Pro", () => {
     expect(rt.submit(0, { name: "finish", payload: {} }, "human")).toEqual({ ok: true });
     expect(rt.over).toBe(true);
     const over = game.def.isOver(rt.state) as any;
-    expect(over.text).toBe("Ann played for five minutes and recalled two configurations from the phone, saved one new configuration.");
+    expect(over.text).toBe("Ann played for five minutes and recalled two configurations from the phone and saved one new configuration.");
     expect((rt.boardView() as any).click.on).toBe(false);
     expect(replaysExactly(game, rt)).toBe(true);
   });
@@ -151,11 +170,17 @@ describe("GE150 Pro", () => {
   it("starts over with the new player's own configurations when the seat changes hands", () => {
     const { rt } = connected();
     rt.submit(0, { name: "capture", payload: { config: config("a") } }, "board");
+    rt.submit(0, { name: "apply", payload: { id: "a" } }, "human"); // queued, not yet carried out by the board
     rt.seatChanged({ seat: 0, playerId: "p9", name: "Zoe", kind: "human", edge: "south" });
     const st = rt.state as any;
     expect(st.player).toBe("Zoe");
     expect(st.configs).toEqual([]);
     expect(st.synced).toBe(false);
+    // the last player's queued command and counts do not carry over; numbering goes on (the board skips done ones)
+    expect(st.commands).toEqual([]);
+    expect(st.stats).toEqual({ recalls: 0, applied: 0, switched: 0, captured: 0 });
+    rt.submit(0, { name: "select", payload: { index: 7 } }, "human");
+    expect((rt.state as any).commands[0].n).toBe(2);
   });
 });
 

@@ -51,7 +51,15 @@ var CrcError = class extends Error {
 };
 var Reassembler = class {
   buf = new Uint8Array(0);
-  /** Feed one input report; returns every message completed by it. */
+  /** Messages dropped for a bad CRC since the last call to takeErrors(). */
+  errors = [];
+  /** The CRC errors met since the last call (the messages themselves were dropped, the ones after them kept). */
+  takeErrors() {
+    const e = this.errors;
+    this.errors = [];
+    return e;
+  }
+  /** Feed one input report; returns every message completed by it. A message with a bad CRC is dropped. */
   push(report) {
     const n = Math.min(report[0], report.length - 1);
     const chunk = report.subarray(1, 1 + n);
@@ -70,8 +78,8 @@ var Reassembler = class {
       if (this.buf.length < len + 6) break;
       const msg = this.buf.subarray(0, len + 6);
       const crc = msg[4 + len] << 8 | msg[5 + len];
-      if (crc16(msg.subarray(2, 4 + len)) !== crc) throw new CrcError(`bad CRC for cmd 0x${msg[4].toString(16)}`);
-      out.push({ cmd: msg[4], payload: msg.slice(5, 4 + len) });
+      if (crc16(msg.subarray(2, 4 + len)) !== crc) this.errors.push(new CrcError(`bad CRC for cmd 0x${msg[4].toString(16)}`));
+      else out.push({ cmd: msg[4], payload: msg.slice(5, 4 + len) });
       this.buf = this.buf.slice(len + 6);
     }
     return out;
@@ -415,17 +423,10 @@ var GE150Pro = class _GE150Pro {
   };
   onReport = (e) => {
     const report = new Uint8Array(e.data.buffer, e.data.byteOffset, e.data.byteLength);
-    let messages;
-    try {
-      messages = this.rx.push(report);
-    } catch (err) {
-      this.emit("error", err);
-      return;
-    }
-    for (const m of messages) this.dispatch(m);
+    for (const m of this.rx.push(report)) this.dispatch(m);
+    for (const e2 of this.rx.takeErrors()) this.emit("error", e2);
   };
   dispatch(m) {
-    this.emit("message", m, "in");
     const p = m.payload;
     if (m.cmd === Cmd.PRESET_DUMP) this.emit("preset", decodePreset(p));
     else if (m.cmd === Cmd.STORE_ACK) this.emit("stored", p[0]);
@@ -454,7 +455,6 @@ var GE150Pro = class _GE150Pro {
     const job = this.queue.then(async () => {
       for (const r of toReports(stream)) await this.dev.sendReport(0, r);
       if (stream[4] === Cmd.REQUEST_CURRENT) this.answers.push(answered);
-      this.emit("message", { cmd: stream[4], payload: stream.slice(5, stream.length - 2) }, "out");
       if (stream[4] === Cmd.SELECT_PRESET) await new Promise((r) => setTimeout(r, SELECT_SETTLE_MS));
     });
     this.queue = job.catch((e) => this.emit("error", e));
@@ -485,6 +485,14 @@ var GE150Pro = class _GE150Pro {
       const i = this.answers.indexOf(done);
       if (i >= 0) this.answers.splice(i, 1);
     }
+  }
+  /**
+   * Select a preset and wait until its live state has been read back: the pedal answers a host selection with
+   * nothing, so this asks (B0) once it has loaded the preset.
+   */
+  async selectAndRead(index) {
+    await this.selectPreset(index);
+    await this.readCurrent();
   }
   /** Resolves once the pedal has loaded the preset (see SELECT_SETTLE_MS). */
   selectPreset(index) {
