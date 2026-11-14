@@ -31,6 +31,8 @@
     modules: Array.from({ length: 9 }, (_, s) => ({ on: (s + i) % 2 === 0, type: s % 3, values: [50, 50, 50, 0, 0, 0, 0, 0, 0, 0] })),
     exp: [8, 57, 1, 1, 0, 100],
   }));
+  const LOAD_MS = 120;
+  let loading;
   const state = { current: 5, live: structuredClone(presets[4].modules), exp: [...presets[4].exp] };
   const moduleBytes = (m) => u16(m.on ? 1 : 0, m.type, ...m.values);
   const readModule = (p, o = 0) => {
@@ -87,9 +89,14 @@
     } else if (cmd >= 0x82 && cmd <= 0x8a) {
       state.live[cmd - 0x82] = readModule(p);
     } else if (cmd === 0x96) {
+      // like the hardware: the number switches at once, the modules load later (100-150 ms measured), and a module set
+      // in between is overwritten by the load
       state.current = p[0];
-      state.live = structuredClone(presets[p[0] - 1].modules);
-      state.exp = [...presets[p[0] - 1].exp];
+      clearTimeout(loading);
+      loading = setTimeout(() => {
+        state.live = structuredClone(presets[p[0] - 1].modules);
+        state.exp = [...presets[p[0] - 1].exp];
+      }, LOAD_MS);
     } else if (cmd === 0xc3) {
       const i = p[0];
       for (let s = 0; s < 9; s++) presets[i - 1].modules[s] = readModule(p, 17 + s * 24);

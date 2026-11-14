@@ -110,6 +110,24 @@ describe("the library against the simulated pedal", () => {
   });
 });
 
+describe("a selection on the pedal, which loads the preset's modules later", () => {
+  it("reads the new preset's modules after a selection, not the old ones", async () => {
+    await dev.selectPreset(12);
+    modules.clear();
+    await dev.readCurrent();
+    expect(modules.get(0)).toEqual(fake().state.live[0]);
+    expect(modules.get(0)!.on).toBe(presets.get(12)!.modules[0].on);
+  });
+
+  it("keeps a module set right after a selection (a configuration applied with its preset)", async () => {
+    const m: ModuleState = { on: true, type: 1, values: [66, 1, 2, 3, 4, 5, 6, 7, 8, 9] };
+    await dev.selectPreset(13);
+    await dev.setModule(2, m);
+    await new Promise((r) => setTimeout(r, 200)); // past the simulated load
+    expect(fake().state.live[2]).toEqual(m);
+  });
+});
+
 describe("waiting for the pedal's answer", () => {
   it("readCurrent waits for its own answer, not one to an earlier request", async () => {
     let answers = 0;
