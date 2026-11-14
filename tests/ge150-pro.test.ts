@@ -3,11 +3,12 @@
 // a player exchanged mid-game.
 import { describe, expect, it } from "vitest";
 import { loadGame, replaysExactly, seats, start } from "./harness.ts";
+import { PRESET_COUNT, SLOT_COUNT } from "../src/ge150/preset.ts";
 
 const game = await loadGame("ge150-pro");
 const one = () => ({ seats: seats(1) });
-const names = Array.from({ length: 200 }, (_, i) => `Preset ${i + 1}`);
-const chain = Array.from({ length: 9 }, (_, s) => ({ on: s % 2 === 0, type: s }));
+const names = Array.from({ length: PRESET_COUNT }, (_, i) => `Preset ${i + 1}`);
+const chain = Array.from({ length: SLOT_COUNT }, (_, s) => ({ on: s % 2 === 0, type: s }));
 const snap = (on: boolean, type: number, first = 50) => ({ on, type, values: [first, 50, 50, 0, 0, 0, 0, 0, 0, 0] });
 const config = (id: string, extra: Record<string, unknown> = {}) => ({ id, name: `Config ${id}`, slot: null, trigger: null, preset: null, modules: { "2": snap(true, 6, 77) }, ...extra });
 const wait = (clock: { setTimeout(fn: () => void, ms: number): unknown; advance(): boolean }, ms: number) => {
@@ -26,6 +27,15 @@ describe("GE150 Pro", () => {
     const { rt } = start(game, 1, {}, 1, one());
     expect(rt.boardView()).toMatchObject({ seat: 0, done: false, pedal: { connected: false, current: 0 }, configs: [], commands: [] });
     expect(rt.view(0)).toEqual(rt.boardView());
+  });
+
+  it("counts presets and modules as the library does (the rules keep their own copy of the numbers)", () => {
+    // the board sends what the library decodes: a list of PRESET_COUNT names and a chain of SLOT_COUNT modules
+    const { rt } = connected();
+    expect((rt.boardView() as any).pedal.names).toHaveLength(PRESET_COUNT);
+    expect((rt.boardView() as any).pedal.chain).toHaveLength(SLOT_COUNT);
+    expect(rt.submit(0, { name: "pedal", payload: { names: [...names, "one more"] } }, "board")).toMatchObject({ ok: false });
+    expect(rt.submit(0, { name: "pedal", payload: { chain: chain.slice(1) } }, "board")).toMatchObject({ ok: false });
   });
 
   it("takes the board's reports about the pedal, field by field, and refuses broken ones", () => {

@@ -425,7 +425,6 @@ var GE150Pro = class _GE150Pro {
     for (const m of messages) this.dispatch(m);
   };
   dispatch(m) {
-    this.emit("message", m, "in");
     const p = m.payload;
     if (m.cmd === Cmd.PRESET_DUMP) this.emit("preset", decodePreset(p));
     else if (m.cmd === Cmd.STORE_ACK) this.emit("stored", p[0]);
@@ -454,7 +453,6 @@ var GE150Pro = class _GE150Pro {
     const job = this.queue.then(async () => {
       for (const r of toReports(stream)) await this.dev.sendReport(0, r);
       if (stream[4] === Cmd.REQUEST_CURRENT) this.answers.push(answered);
-      this.emit("message", { cmd: stream[4], payload: stream.slice(5, stream.length - 2) }, "out");
       if (stream[4] === Cmd.SELECT_PRESET) await new Promise((r) => setTimeout(r, SELECT_SETTLE_MS));
     });
     this.queue = job.catch((e) => this.emit("error", e));

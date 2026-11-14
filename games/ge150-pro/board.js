@@ -247,6 +247,7 @@ export function mount(root, ctx) {
 
   function adopt(index) {
     if (index < 1 || index > lib.PRESET_COUNT) return;
+    if (index !== current) dropEdits(); // fader values still waiting belong to the preset left behind
     current = index;
     bank = Math.floor((index - 1) / 4) + 1;
     const p = stored.get(index);
@@ -274,11 +275,14 @@ export function mount(root, ctx) {
 
   /** A footswitch selected a preset on the pedal: apply the configuration it triggers (E-004). The pedal reports `16`
    * only for its own selections, never for ours, so no selection of ours needs filtering out. */
-  async function onSwitched(index) {
+  function onSwitched(index) {
     if (!ready) return;
-    const c = view?.configs.find((x) => x.trigger === index);
-    if (c) await applyConfig(c, true);
-    if (plays()) ctx.act(playerSeat(), "switched", c ? { index, config: c.id } : { index });
+    // one queue for all pedal work, so a configuration never interleaves with a phone command
+    later(async () => {
+      const c = view?.configs.find((x) => x.trigger === index);
+      if (c) await applyConfig(c, true);
+      if (plays()) ctx.act(playerSeat(), "switched", c ? { index, config: c.id } : { index });
+    });
   }
 
   /** The pedal plugged in (again): connect by itself, as at the start. */
@@ -310,8 +314,10 @@ export function mount(root, ctx) {
 
   async function select(index) {
     if (!dev) return;
-    await dev.selectPreset(index);
+    // the board switches first, so edits made while the pedal loads the preset belong to the new preset, which is
+    // where the device queue delivers them
     adopt(index);
+    await dev.selectPreset(index);
     // the pedal answers a host selection with nothing: read the new preset's live state, and wait for it
     await dev.readCurrent();
   }
@@ -328,6 +334,13 @@ export function mount(root, ctx) {
   }
 
   // ---- editing on the board --------------------------------------------------------------------------------------
+  /** Forget fader values still waiting to be sent (the preset changed). */
+  function dropEdits() {
+    for (const t of sendTimers.values()) clearTimeout(t);
+    sendTimers.clear();
+    sendNext.clear();
+  }
+
   function setModule(slot, m) {
     modules[slot] = m;
     drawLive();
