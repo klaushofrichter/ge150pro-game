@@ -48,7 +48,10 @@ beforeAll(async () => {
   dev.on("error", (e) => {
     throw e;
   });
+  // like the board: write only once the connect check has passed (the library refuses writes before)
+  const checked = new Promise<boolean>((r) => dev.on("checked", (c) => r(c.ok)));
   await dev.open();
+  expect(await checked).toBe(true);
   await until(() => presets.size === PRESET_COUNT && currents.length > 0);
 });
 
