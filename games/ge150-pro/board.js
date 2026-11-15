@@ -253,7 +253,16 @@ export function mount(root, ctx) {
       report({ rhythm: r });
     });
     d.on("stored", (i) => {
-      if (i === current && modules) stored.set(i, { ...stored.get(i), modules: structuredClone(kept()) });
+      if (i === current && modules) {
+        const keep = kept();
+        stored.set(i, { ...stored.get(i), modules: structuredClone(keep) });
+        // storing also loads the stored values into the sound: put back the value the expression pedal had set
+        const moved = keep.findIndex((m, s) => !sameModule(m, modules[s]));
+        if (moved >= 0) {
+          const m = structuredClone(modules[moved]);
+          later(() => d.setModule(moved, m));
+        }
+      }
       afterLiveChange();
     });
     d.on("disconnect", () => {
