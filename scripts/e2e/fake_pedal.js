@@ -3,6 +3,7 @@
 // connect sequence, live module state, a footswitch). Nothing here ships to tables.
 //   window.__pedal.log      host commands received: [{ cmd, payload: number[] }]
 //   window.__pedal.press(i) a footswitch selecting preset i (the pedal reports 16)
+//   window.__pedal.pressGarbled(i) the same, its report damaged once (a bad CRC) and then sent intact
 //   window.__pedal.state    the simulated pedal: current preset, live modules
 (() => {
   // Options set before this script (Playwright init script): { absent, firmware: "other", busy }.
@@ -190,6 +191,15 @@
       state.current = i;
       state.live = structuredClone(presets[i - 1].modules);
       reply(0x16, [i]);
+    },
+    /** A footswitch press reported twice in one report, the first copy with a broken CRC (a damaged transfer). */
+    pressGarbled(i) {
+      state.current = i;
+      state.live = structuredClone(presets[i - 1].modules);
+      const bad = frame(0x16, [i]);
+      bad[bad.length - 1] ^= 0xff;
+      emit([...bad, ...frame(0x16, [i])]);
+      setTimeout(flush, 2);
     },
   };
 })();

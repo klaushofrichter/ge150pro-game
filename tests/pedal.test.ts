@@ -12,6 +12,7 @@ interface Fake {
   log: { cmd: number; payload: number[] }[];
   state: { current: number; live: ModuleState[] };
   press(index: number): void;
+  pressGarbled(index: number): void;
 }
 
 const g = globalThis as unknown as { window: unknown; __pedal: Fake };
@@ -27,6 +28,7 @@ let dev: GE150Pro;
 const presets = new Map<number, Preset>();
 const currents: number[] = [];
 const switched: number[] = [];
+const errors: string[] = [];
 const stored: number[] = [];
 const modules = new Map<number, ModuleState>();
 let rhythmBpm = 0;
@@ -45,9 +47,7 @@ beforeAll(async () => {
   dev.on("module", (s, m) => modules.set(s, m));
   dev.on("rhythm", (r) => (rhythmBpm = r.bpm));
   dev.on("exp", () => expSeen++);
-  dev.on("error", (e) => {
-    throw e;
-  });
+  dev.on("error", (e) => errors.push(e.message));
   // like the board: write only once the connect check has passed (the library refuses writes before)
   const checked = new Promise<boolean>((r) => dev.on("checked", (c) => r(c.ok)));
   await dev.open();
@@ -125,6 +125,28 @@ describe("a selection on the pedal, which loads the preset's modules later", () 
     await dev.setModule(2, m);
     await new Promise((r) => setTimeout(r, 200)); // past the simulated load
     expect(fake().state.live[2]).toEqual(m);
+  });
+});
+
+describe("selecting and reading back in one step", () => {
+  it("selectAndRead resolves with the new preset's live modules in place", async () => {
+    modules.clear();
+    await dev.selectAndRead(20);
+    expect(fake().state.current).toBe(20);
+    expect(modules.size).toBe(9);
+    expect(modules.get(0)).toEqual(fake().state.live[0]);
+    expect(currents.at(-1)).toBe(20);
+  });
+});
+
+describe("a damaged transfer", () => {
+  it("drops only the message with the bad CRC, reports it, and still delivers the next one", async () => {
+    const before = switched.length;
+    errors.length = 0;
+    fake().pressGarbled(11);
+    await until(() => switched.length > before);
+    expect(switched.slice(before)).toEqual([11]);
+    expect(errors).toEqual(["bad CRC for cmd 0x16"]);
   });
 });
 

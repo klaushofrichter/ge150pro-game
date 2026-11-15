@@ -4,7 +4,7 @@ import { handshake, selectPreset, setModule } from '../src/ge150/commands.ts';
 import { decodeModule, decodePreset, encodePreset, presetLabel, PRESET_BODY_BYTES } from '../src/ge150/preset.ts';
 import { decodeRhythm, requestRhythm, styleName } from '../src/ge150/rhythm.ts';
 import { catalog, formatValue, rawRange } from '../src/ge150/catalog.ts';
-import { decodeExpReport, EXP_PARAMS, expLabel, expTarget } from '../src/ge150/exp.ts';
+import { decodeExpReport, EXP_PARAMS, expLabel, expTarget, withoutPedalMove } from '../src/ge150/exp.ts';
 
 const hex = (s: string) => Uint8Array.from(s.replace(/\s+/g, '').match(/../g)!.map((b) => parseInt(b, 16)));
 const toHex = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
@@ -142,6 +142,27 @@ describe('expression pedal', () => {
 
   it('starts each module at the parameter id the editor sent when switching modules', () => {
     expect(EXP_PARAMS.map((list) => list[0].id)).toEqual([0, 10, 13, 19, 21, 25, 39, 51, 57]);
+  });
+
+  // Recorded 2026-11-14: EXP on DS GAIN (1 / 12), DS model 14; the pedal moved GAIN from 35 to 100.
+  const ds = (values: number[]) => Array.from({ length: 9 }, (_, s) => ({ on: true, type: s === 1 ? 14 : 0, values: s === 1 ? values : Array(10).fill(0) }));
+  const dsGain = { MODULE_CTRL: 1, PARA_CTRL: 12 };
+  const gainPos = expTarget(dsGain, 14)!.pos;
+  const at = (v: number, other = 27) => Array.from({ length: 10 }, (_, i) => (i === gainPos ? v : i === (gainPos + 1) % 3 ? other : 0));
+
+  it('reports the toe switch as a mode change only (FUN_SWITCH)', () => {
+    expect(decodeExpReport(0x18, hex('0100 0c00 0000'))).toEqual({ MODULE_CTRL: 1, PARA_CTRL: 12, FUN_SWITCH: 0 });
+    expect(decodeExpReport(0x18, hex('0100 0c00 0100'))).toEqual({ MODULE_CTRL: 1, PARA_CTRL: 12, FUN_SWITCH: 1 });
+  });
+
+  it("puts back the stored value of the parameter the pedal moved, and keeps other edits", () => {
+    const stored = ds(at(35));
+    expect(withoutPedalMove(dsGain, ds(at(100)), stored)[1].values).toEqual(at(35));
+    expect(withoutPedalMove(dsGain, ds(at(100, 40)), stored)[1].values).toEqual(at(35, 40));
+    const same = ds(at(35));
+    expect(withoutPedalMove(dsGain, same, stored)).toBe(same);
+    const otherModel = ds(at(100)).with(1, { on: true, type: 3, values: at(100) });
+    expect(withoutPedalMove(dsGain, otherModel, stored)).toBe(otherModel);
   });
 });
 
