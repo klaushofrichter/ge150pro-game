@@ -309,6 +309,13 @@ function expTarget(e, type) {
   const params = model(e.MODULE_CTRL, type)?.params ?? [];
   return name ? params.find((p) => (EXP_NAME[p.name.toUpperCase()] ?? p.name.toUpperCase()) === name) : void 0;
 }
+function withoutPedalMove(e, modules, stored) {
+  const slot = e.MODULE_CTRL;
+  const live = modules[slot], base = stored[slot];
+  const spec = live && base && live.type === base.type ? expTarget(e, live.type) : void 0;
+  if (!spec || live.values[spec.pos] === base.values[spec.pos]) return modules;
+  return modules.with(slot, { ...live, values: live.values.with(spec.pos, base.values[spec.pos]) });
+}
 function decodeExpReport(cmd, p) {
   const [a, b, c] = [0, 2, 4].map((o) => readU16(p, o));
   if (cmd === ExpCmd.FUNCTION) return { MODULE_CTRL: a, PARA_CTRL: b, FUN_SWITCH: c };
@@ -520,5 +527,6 @@ export {
   presetLabel,
   rawFraction,
   rawRange,
-  styleName
+  styleName,
+  withoutPedalMove
 };
