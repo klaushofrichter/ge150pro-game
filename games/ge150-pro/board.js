@@ -129,7 +129,12 @@ export function mount(root, ctx) {
   }
   const chainOf = (mods) => mods.map((m) => ({ on: m.on, type: m.type }));
   const sameModule = (a, b) => a && b && a.on === b.on && a.type === b.type && a.values.every((v, i) => v === b.values[i]);
-  const modifiedNow = () => !!modules && !!stored.get(current) && modules.some((m, s) => !sameModule(m, stored.get(current).modules[s]));
+  /** The live modules as Save keeps them: without the expression pedal's position (playing, not an edit). */
+  const kept = () => {
+    const base = stored.get(current);
+    return base && modules ? lib.withoutPedalMove(base.exp, modules, base.modules) : modules;
+  };
+  const modifiedNow = () => !!modules && !!stored.get(current) && kept().some((m, s) => !sameModule(m, stored.get(current).modules[s]));
 
   // ---- the pedal ------------------------------------------------------------------------------------------------
   async function loadLib() {
@@ -248,7 +253,16 @@ export function mount(root, ctx) {
       report({ rhythm: r });
     });
     d.on("stored", (i) => {
-      if (i === current && modules) stored.set(i, { ...stored.get(i), modules: structuredClone(modules) });
+      if (i === current && modules) {
+        const keep = kept();
+        stored.set(i, { ...stored.get(i), modules: structuredClone(keep) });
+        // storing also loads the stored values into the sound: put back the value the expression pedal had set
+        const moved = keep.findIndex((m, s) => !sameModule(m, modules[s]));
+        if (moved >= 0) {
+          const m = structuredClone(modules[moved]);
+          later(() => d.setModule(moved, m));
+        }
+      }
       afterLiveChange();
     });
     d.on("disconnect", () => {
@@ -285,7 +299,8 @@ export function mount(root, ctx) {
     const on = exp.FUN_SWITCH === 1;
     const m = modules?.[exp.MODULE_CTRL];
     const spec = on && m ? lib.expTarget(exp, m.type) : undefined;
-    report({ exp: { label: on ? lib.expLabel(exp) : "Off", value: spec ? lib.formatValue(spec, m.values[spec.pos]) : "" } });
+    // FUN_SWITCH is the toe switch's mode: 1 the pedal moves the assigned parameter, 0 the volume (if EXP VOL is on)
+    report({ exp: { label: on ? lib.expLabel(exp) : exp.VOL_SWITCH === 1 ? "Volume" : "Off", value: spec ? lib.formatValue(spec, m.values[spec.pos]) : "" } });
   }
 
   /** A footswitch selected a preset on the pedal: apply the configuration it triggers (E-004). The pedal reports `16`
@@ -567,7 +582,8 @@ export function mount(root, ctx) {
           closeSheet();
           const p = stored.get(current);
           if (!p || !dev) return;
-          await dev.storePreset({ ...p, modules: structuredClone(modules), exp: { ...p.exp, ...(exp ?? {}) } }).catch(() => {});
+          // the toe switch's mode is playing too: the preset keeps its own FUN_SWITCH
+          await dev.storePreset({ ...p, modules: structuredClone(kept()), exp: { ...p.exp, ...(exp ?? {}), FUN_SWITCH: p.exp.FUN_SWITCH } }).catch(() => {});
         };
       },
     );
@@ -576,7 +592,7 @@ export function mount(root, ctx) {
   function openCapture() {
     if (!canEdit()) return;
     const base = stored.get(current);
-    const changed = modules.map((m, s) => !base || !sameModule(m, base.modules[s]));
+    const changed = kept().map((m, s) => !base || !sameModule(m, base.modules[s]));
     const pick = new Set(changed.some(Boolean) ? changed.flatMap((c, s) => (c ? [s] : [])) : modules.flatMap((m, s) => (m.on ? [s] : [])));
     const quick = Array.from({ length: view.quickSlots }, (_, q) => q);
     let slot = quick.find((q) => !view.configs.some((c) => c.slot === q)) ?? null;

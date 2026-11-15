@@ -1,7 +1,7 @@
 // Expression pedal assignment, per preset. See docs/protocol.md.
 import { model, type ParamSpec } from './catalog.ts';
 import { readU16 } from './frame.ts';
-import type { ExpSettings } from './preset.ts';
+import type { ExpSettings, ModuleState } from './preset.ts';
 
 export const ExpCmd = {
   /** MODULE_CTRL, PARA_CTRL, FUN_SWITCH (u16 LE each). */
@@ -45,6 +45,19 @@ export function expTarget(e: Pick<ExpSettings, 'MODULE_CTRL' | 'PARA_CTRL'>, typ
   const name = EXP_PARAMS[e.MODULE_CTRL]?.find((p) => p.id === e.PARA_CTRL)?.name;
   const params = model(e.MODULE_CTRL, type)?.params ?? [];
   return name ? params.find((p) => (EXP_NAME[p.name.toUpperCase()] ?? p.name.toUpperCase()) === name) : undefined;
+}
+
+/**
+ * `modules` with the value the expression pedal moved put back to the stored one. The pedal's position, like its toe
+ * switch (EXP or volume mode), is playing, not an edit: it neither marks the preset as changed nor gets stored.
+ * Modules whose model differs from the stored one are left as they are.
+ */
+export function withoutPedalMove(e: Pick<ExpSettings, 'MODULE_CTRL' | 'PARA_CTRL'>, modules: ModuleState[], stored: ModuleState[]): ModuleState[] {
+  const slot = e.MODULE_CTRL;
+  const live = modules[slot], base = stored[slot];
+  const spec = live && base && live.type === base.type ? expTarget(e, live.type) : undefined;
+  if (!spec || live.values[spec.pos] === base.values[spec.pos]) return modules;
+  return modules.with(slot, { ...live, values: live.values.with(spec.pos, base.values[spec.pos]) });
 }
 
 /** Decode a device report (18 or 33) into the part of ExpSettings it carries. */
