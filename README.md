@@ -36,6 +36,12 @@ play. The table only controls the pedal; the guitar plays through the pedal as a
 Rules for players: [`games/ge150-pro/how-to-play.md`](games/ge150-pro/how-to-play.md). Decisions:
 [`docs/decisions.md`](docs/decisions.md).
 
+**Editing and managing presets** away from the table: the web app
+[**GE150 Pro Editor**](https://klaushofrichter.github.io/ge150pro-editor/)
+([klaushofrichter/ge150pro-editor](https://github.com/klaushofrichter/ge150pro-editor)) edits and manages the pedal's
+presets in the browser, with the pedal connected to that computer by USB. It runs directly from that address, with
+nothing to install. Like Mooer's own editor, it can't share the pedal with the table at the same time.
+
 ## Table setup
 
 The pedal must be connected to the **table's computer** by USB (the board's browser drives it over WebHID). Only one
