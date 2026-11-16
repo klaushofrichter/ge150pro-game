@@ -40,7 +40,7 @@ Rules for players: [`games/ge150-pro/how-to-play.md`](games/ge150-pro/how-to-pla
 [**GE150 Pro Editor**](https://klaushofrichter.github.io/ge150pro-editor/)
 ([klaushofrichter/ge150pro-editor](https://github.com/klaushofrichter/ge150pro-editor)) edits and manages the pedal's
 presets in the browser, with the pedal connected to that computer by USB. It runs directly from that address, with
-nothing to install. Like Mooer's own editor, it can't share the pedal with the table at the same time.
+nothing to install.
 
 ## Table setup
 
