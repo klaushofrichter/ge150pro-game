@@ -45,6 +45,8 @@ Records are history: an older record is not edited when a newer one changes it. 
   **table click**, played by the board's speakers: start/stop, tempo (±, tap, or following the pedal's drum machine),
   beats per bar with an accent. Its volume is a board setting. *Why:* a rhythm the phone can control, honestly
   labelled as the table's.
+  2026-11-16: tap tempo takes two taps, like the pedal's TAP (which reports its new BPM in one `0C`); while the
+  click follows the pedal, a note says that tapping on the phone sets the table click only.
 - **E-006 · 2026-11-13 · Claude** — The player's configurations are kept in the phone's browser between games (like
   synth-game's favourites, synth-game E-013): sent to the game once (`configs`), kept up to date from it. Another
   player taking the seat starts without configurations until their phone sends its own. *Why:* they belong to the

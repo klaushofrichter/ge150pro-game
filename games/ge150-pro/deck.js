@@ -50,6 +50,7 @@ export function mount(root, ctx) {
           <div class="gd-click-btns"><button type="button" class="gd-tap">Tap</button><button type="button" class="gd-start primary">Start</button></div>
           <div class="gd-click-opts"><button type="button" class="gd-follow" aria-pressed="false">Follow pedal tempo</button>
             <button type="button" class="gd-beats">4 beats</button></div>
+          <div class="gd-note muted gd-tap-note"></div>
           <div class="gd-note muted">Played by the table's speakers, not through the pedal.</div></div>
       </section>
       <section class="gd-page gd-setup" data-page="setup" hidden>
@@ -117,6 +118,9 @@ export function mount(root, ctx) {
     $(".gd-start").classList.toggle("on", c.on);
     $(".gd-start").classList.toggle("primary", !c.on); // Start is the primary action; a running click's Stop is not
     $(".gd-follow").setAttribute("aria-pressed", String(c.follow));
+    $(".gd-tap-note").textContent = c.follow
+      ? "Following the pedal's tempo. Tap here twice to set the table click only: it stops following. The pedal's tempo is set with TAP on the pedal."
+      : "Tap twice to set the tempo, like TAP on the pedal; more taps are averaged.";
     $(".gd-beats").textContent = `${c.beats} ${c.beats === 1 ? "beat" : "beats"}`;
     for (const s of [".gd-start", ".gd-tap", ".gd-minus", ".gd-plus", ".gd-follow", ".gd-beats"]) $(s).disabled = view.done;
     // Pedal
@@ -171,10 +175,10 @@ export function mount(root, ctx) {
     send("click", { beats: order[(order.indexOf(view.click.beats) + 1) % order.length] });
   });
   $(".gd-tap").addEventListener("click", () => {
-    // the average of the last taps, once at least three arrive within two seconds of each other
+    // like the pedal's TAP: the gap between two taps; more taps within two seconds of each other are averaged
     const now = performance.now();
     taps = taps.filter((t) => now - t < 2000).concat(now).slice(-6);
-    if (taps.length >= 3) {
+    if (taps.length >= 2) {
       const gaps = taps.slice(1).map((t, i) => t - taps[i]);
       const bpm = Math.round(60000 / (gaps.reduce((a, b) => a + b, 0) / gaps.length));
       if (bpm >= 30 && bpm <= 300) send("click", { bpm, follow: false });
