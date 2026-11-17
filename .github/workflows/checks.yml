@@ -46,7 +46,8 @@ jobs:
       # noEmit over the game, the library, tests and scripts: vitest strips types, so nothing else checks them.
       - run: npm run typecheck
       # `high`, so a moderate advisory whose only fix is a major upgrade cannot wedge unrelated merges.
-      - run: npm audit --audit-level=high
+      # High-severity advisories stop the job, except the few games-service lets through for a while (its D-305).
+      - run: node .games-service/scripts/npm-audit.mjs
 
   e2e:
     runs-on: ${{ vars.CI_RUNNER == 'self' && fromJSON('["self-hosted","ci-private"]') || 'ubuntu-latest' }}
