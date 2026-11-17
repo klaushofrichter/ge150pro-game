@@ -113,6 +113,33 @@ export function mount(root, ctx) {
   /** This board drives the pedal: the table's own board, for the player sitting at the table (controlSeats). */
   const plays = () => !!info && !!view && info.controlSeats?.includes(view.seat);
 
+  // ---- the table's configurations (E-017) -----------------------------------------------------------------------
+  // The configurations are the table's: kept in its game data between games (games-service D-302), shared by everyone
+  // who plays here. The board that drives the pedal brings them to the game once, then keeps the table's copy in step
+  // with the game's. On a table without game data (an older platform) the phone keeps its own, as before (E-006).
+  /** A configuration as it is kept: without what the view adds for showing it. */
+  const forTable = (configs) => (configs ?? []).map(({ id, name, slot, trigger, preset, modules }) => ({ id, name, slot, trigger, preset, modules }));
+  let tableAsked = false;
+  let tableHas = null; // the table's copy, as JSON
+  async function syncTable() {
+    if (!ctx.store || !plays() || view.done) return;
+    if (!view.shared) {
+      if (tableAsked) return;
+      tableAsked = true;
+      const stored = await ctx.store.get("configs");
+      const list = Array.isArray(stored) ? stored : [];
+      tableHas = JSON.stringify(list);
+      const r = await ctx.act(playerSeat(), "configs", { list, shared: true });
+      if (!r?.ok) tableAsked = false; // (asked again with the next update)
+      return;
+    }
+    const now = JSON.stringify(forTable(view.configs));
+    if (now === tableHas) return;
+    tableHas = now;
+    const r = await ctx.store.set("configs", JSON.parse(now));
+    if (!r?.ok) notice(`The configurations could not be saved on the table${r?.reason ? `: ${r.reason}` : ""}`);
+  }
+
   // ---- reports to the rules -------------------------------------------------------------------------------------
   function report(patch) {
     if (!plays() || view?.done) return;
@@ -772,6 +799,7 @@ export function mount(root, ctx) {
       seatPlates(root, info).classList.toggle("gp-north", info.rotation === 180);
       box.classList.toggle("gp-north", info.rotation === 180);
       const local = plays();
+      syncTable();
       box.classList.toggle("gp-remote", !local);
       const away = $(".gp-away");
       away.hidden = local;

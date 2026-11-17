@@ -37,7 +37,7 @@ function randomIntent(r: () => number, ids: string[]) {
     ["done", () => ({ n: pick([int(1, 60), junk()]) }), "board"],
     ["switched", () => ({ index: int(1, 200), config: id() }), "board"],
     ["click", () => pick([{ on: r() < 0.5 }, { bpm: int(20, 320) }, { beats: int(0, 13) }, { follow: r() < 0.5 }]), "human"],
-    ["configs", () => ({ list: Array.from({ length: int(0, 40) }, config) }), "human"],
+    ["configs", () => ({ list: Array.from({ length: int(0, 40) }, config), ...pick([{}, { merge: true }, { shared: true }, { shared: junk(), merge: junk() }]) }), pick(["board", "human"])],
     [pick(["dance", "", "pedal "]), () => junk(), "human"],
   ];
   const [name, payload, by] = pick(choices);
