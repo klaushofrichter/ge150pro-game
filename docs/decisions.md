@@ -122,3 +122,13 @@ Records are history: an older record is not edited when a newer one changes it. 
   *Checks:* `tests/ge150-pro.test.ts` (the table's list, the merge, a seat change), `tests/robustness.test.ts`,
   `scripts/e2e/ge150_pro.py` (a phone's old configuration moves; the table keeps both) and `ge150_pro_flows.py` (the
   next game has them).
+- **E-018 · 2026-11-17 · Klaus** — Fixes from the code review of all game repositories (games-service D-304), in how
+  the board keeps the table's configurations (E-017).
+  - **A table that could not be asked was taken for one without configurations.** If the board's connection was
+    not up when the game started, the read gave nothing, the game began with no configurations "from the table", and
+    the first capture wrote that single one over everything the table kept. The platform's read now throws when the
+    table gives no answer; the board asks again (with the next update, or after three seconds) and brings nothing
+    until it has an answer.
+  - **A write the table refused was never tried again** (too many changes at once, a dropped connection): the board
+    noted the list as saved before it was. It now notes it once the table has it, says when saving failed, and tries
+    again, also when nothing else changes.
