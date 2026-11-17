@@ -78,6 +78,16 @@ def main():
                 deck.locator("#tab-game").click()
             wait(lambda: "Preset 5" in deck.locator(".gd-name").inner_text(), 10, "the phone to show the current preset")
             shot(board, "board")
+            # Turned to North: the connection and Save stay at the top of the screen, clear of the platform's buttons.
+            a("POST", "/face", {"edge": "north"})
+            wait(lambda: board.locator(".gp-root.gp-north").count(), 5, "the board to turn north")
+            time.sleep(0.3)
+            for sel in (".gp-conn", ".gp-save"):
+                b = board.locator(sel).bounding_box()
+                assert b and b["y"] + b["height"] <= 120, f"{sel} stays at the top when turned: {b}"
+            shot(board, "board-north")
+            a("POST", "/face", {"edge": "south"})
+            wait(lambda: not board.locator(".gp-root.gp-north").count(), 5, "the board to turn back south")
             check(deck, "phone Play")
             tabs = deck.locator(".gd-tabs").bounding_box()
             assert tabs and tabs["y"] + tabs["height"] <= 568 + 1, f"the game's tabs are on screen: {tabs}"
