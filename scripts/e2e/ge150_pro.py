@@ -14,7 +14,7 @@ Checks on the way:
   - Finish asks first, then ends with a summary.
   python3 scripts/e2e/ge150_pro.py out/
 """
-import os, sys, time
+import json, os, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -42,6 +42,21 @@ def main():
             board = T.board(browser)
             board.wait_for_selector("button.tile")
             deck = phone(browser, "Klaus", 320, 568)
+            # A configuration this phone kept in its browser with an earlier version (E-006): with the table's game
+            # data (E-017, games-service D-302) it moves to the table once; without, the phone sends it as before.
+            old = {"id": "old-phone-config", "name": "From the phone", "slot": 7, "trigger": None, "preset": 9, "modules": {}}
+            deck.evaluate("(c) => localStorage.setItem('ge150-pro.configs', JSON.stringify([c]))", old)
+            try:
+                a("GET", "/game-data")
+                kept_by_table = True
+            except Exception:
+                kept_by_table = False
+
+            def table_configs():
+                try:
+                    return [c["id"] for c in a("GET", "/game-data/ge150-pro")["data"].get("configs", [])]
+                except Exception:
+                    return []
             pick_game(board, "ge150-pro")
             if board.locator(".dialog [data-x=yes]").count():
                 board.locator(".dialog [data-x=yes]").click()
@@ -94,9 +109,15 @@ def main():
             shot(board, "board-capture")
             board.locator(".gp-chip[data-opt=trigger]").click()
             board.locator(".gp-sheet .gp-yes").click()
-            wait(lambda: board.locator(".gp-config").count() == 1, 5, "the configuration to appear on the board")
-            wait(lambda: deck.locator(".gd-slot:not(.empty)").count() == 1, 5, "quick slot 1 on the phone")
-            name = deck.locator(".gd-slot:not(.empty) b").inner_text()
+            wait(lambda: board.locator(".gp-config").count() == 2, 5, "the new configuration beside the phone's old one on the board")
+            wait(lambda: deck.locator(".gd-slot:not(.empty)").count() == 2, 5, "quick slots 1 and 8 on the phone")
+            if kept_by_table:
+                wait(lambda: len(table_configs()) == 2 and "old-phone-config" in table_configs(), 5, "the table to keep both configurations")
+                assert deck.evaluate("() => localStorage.getItem('ge150-pro.configs.moved')") == "1", "the phone did not note that its configuration moved"
+                assert len(json.loads(deck.evaluate("() => localStorage.getItem('ge150-pro.configs')"))) == 1, "the phone still writes its own copy"
+            else:
+                wait(lambda: len(json.loads(deck.evaluate("() => localStorage.getItem('ge150-pro.configs')") or "[]")) == 2, 5, "the phone to keep both configurations")
+            name = deck.locator(".gd-slot:not(.empty) b").first.inner_text()
             assert "2A" in name, f"the configuration's name names the preset: {name}"
 
             # The phone: ▶ selects 2B on the pedal; quick slot 1 recalls the configuration there.
@@ -105,7 +126,7 @@ def main():
             wait(lambda: "Preset 6" in board.locator(".gp-name").inner_text(), 5, "the board to show 2B")
             wait(lambda: "Preset 6" in deck.locator(".gd-name").inner_text(), 5, "the phone to show 2B")
             before = sent(board, 0x83)
-            deck.locator(".gd-slot:not(.empty)").click()
+            deck.locator(".gd-slot:not(.empty)").first.click()
             wait(lambda: sent(board, 0x83) > before, 5, "the pedal to receive the recalled configuration")
             assert board.evaluate("() => window.__pedal.state.live[1].on") is True, "the configuration switches DS on"
             assert board.evaluate("() => window.__pedal.state.live[2].values[0]") == amp, "the configuration sets AMP's value"

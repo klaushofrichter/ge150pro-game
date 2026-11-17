@@ -28,8 +28,8 @@ play. The table only controls the pedal; the guitar plays through the pedal as a
   them without changing the pedal.
 - **The phone** has its own tabs: **Play** (current preset, ◀ ▶, quick slots, the expression pedal's target),
   **Rhythm** (the pedal's drum machine by name and tempo, and a **table click** with tap tempo that can follow the
-  drum machine) and **Pedal** (connection, configurations: rename, delete; **Finish**). The phone keeps the player's
-  configurations between games.
+  drum machine) and **Pedal** (connection, configurations: rename, delete; **Finish**). The table keeps the
+  configurations between games (its game data: *Advanced › Game data* on the board exports, imports and deletes them).
 - **Rhythm** on the pedal itself is started and stopped on the pedal: its firmware takes no rhythm commands over USB
   (nor MIDI start/stop or clock). The table click is the table's own, from its speakers.
 
