@@ -1,6 +1,6 @@
 // GE150 Pro: remote control for a Mooer GE150 Pro connected to the table, for one player (decisions E-001..).
 // The pedal is driven by the table's own board over WebHID (board.js); these rules only keep what the table shares:
-// the pedal's state as the board reports it, the player's configurations (kept on their phone between games), the
+// the pedal's state as the board reports it, the configurations (kept by the table between games, E-017), the
 // commands the phone asks the board to carry out, and the table's click track. No chance and no secrets: every view
 // is the same.
 import { count, defineGame, list, type GameContext, type SeatInfo, type StepDescription, type StepInfo } from "@game-table/sdk";
@@ -78,8 +78,10 @@ export interface State {
   endedAt: number | null;
   pedal: Pedal;
   configs: Config[];
-  /** The phone has sent its stored configurations (for this player). */
+  /** The configurations from earlier games have come: the table's, or the phone's for this player. */
   synced: boolean;
+  /** The configurations are the table's (E-017), shared by everyone who plays here: they stay when the seat changes hands. */
+  shared: boolean;
   commands: Command[];
   nextCommand: number;
   click: Click;
@@ -209,6 +211,7 @@ function view(s: State) {
     pedal: s.pedal,
     configs: s.configs.map((c) => ({ ...c, tags: configTags(c) })),
     synced: s.synced,
+    shared: s.shared,
     commands: s.commands,
     click: s.click,
     /** The click's tempo now: the pedal drum machine's when following it, else its own. */
@@ -254,6 +257,7 @@ export default defineGame<State>({
       pedal: emptyPedal(),
       configs: [],
       synced: false,
+      shared: false,
       commands: [],
       nextCommand: 1,
       click: { on: false, bpm: 100, follow: true, beats: 4, run: 0 },
@@ -337,8 +341,12 @@ export default defineGame<State>({
       }
       // ---- from the phone -------------------------------------------------------------------------------------
       case "configs": {
-        // the phone's stored configurations, once per player; ones made before it came stay (newer)
-        if (state.synced) return { state };
+        // The configurations from earlier games: the table's, sent by the board (`shared`, E-017), or on a table
+        // without game data the phone's, once per player. Ones made before they came stay (newer). `merge` adds a
+        // phone's old ones to the table's, once the table's are here (the move from the phone to the table).
+        const merge = p.merge === true && state.shared;
+        const tables = p.shared === true && !state.shared; // the table's come once, whatever came before
+        if (state.synced && !merge && !tables) return { state };
         const sent = Array.isArray(p.list) ? p.list : [];
         let configs = [...state.configs];
         for (const raw of sent.slice(0, MAX_CONFIGS)) {
@@ -347,7 +355,9 @@ export default defineGame<State>({
             configs.push({ ...c, slot: configs.some((x) => x.slot === c.slot) ? null : c.slot, trigger: configs.some((x) => x.trigger === c.trigger) ? null : c.trigger });
           }
         }
-        return { state: { ...state, configs, synced: true } };
+        const shared = state.shared || tables;
+        if (state.synced && shared === state.shared && configs.length === state.configs.length) return { state };
+        return { state: { ...state, configs, synced: true, shared } };
       }
       case "finish":
         return { state: { ...state, done: true, endedAt: ctx.now(), click: { ...state.click, on: false } }, events: [{ name: "finished" }] };
@@ -376,8 +386,10 @@ export default defineGame<State>({
   },
 
   onSeatChanged(state, seat) {
-    // another person: their phone brings their own configurations; the last player's queued commands and counts end
-    return { state: { ...state, player: seat.name, configs: [], synced: false, commands: [], stats: { recalls: 0, applied: 0, switched: 0, captured: 0 } } };
+    // Another person: the last player's queued commands and counts end. The table's configurations are everyone's
+    // who plays here (E-017); on a table without game data they are the player's own, and the phone brings theirs.
+    const fresh = { ...state, player: seat.name, commands: [], stats: { recalls: 0, applied: 0, switched: 0, captured: 0 } };
+    return { state: state.shared ? fresh : { ...fresh, configs: [], synced: false } };
   },
 
   describe: describeStep,

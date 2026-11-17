@@ -103,3 +103,22 @@ Records are history: an older record is not edited when a newer one changes it. 
   was done. Wording in E-005, E-009, E-010 and E-013 was shortened for this; their decisions are unchanged. *Why:* the
   research is not needed to run the game and stays in the private GE150PRO repository. The commit history is not
   rewritten: earlier wording stays in it (Klaus accepts that).
+- **E-017 · 2026-11-17 · Klaus** — **The configurations are kept by the table, not by the phone.** "There is a growing
+  need for games to store some preferences … per game PC … not per authentication code" (games-service D-302, the
+  table's game data); "go ahead with the GE150 migration". This replaces E-006.
+  - The manifest says `storage: true`; the configurations are one entry of the table's game data (`configs`, the list
+    as the rules keep it; 32 configurations are about 30 KB, under the 48 KB an entry may have), shared by everyone
+    who plays at that table.
+  - The board that drives the pedal brings them to the game once (`configs { list, shared: true }`, a board intent
+    now) and writes the game's list back to the table whenever it changes: a capture, a rename, a delete, from the
+    board or the phone. The rules never read the store. A write the table refuses shows in the board's bar.
+  - They stay when the seat changes hands (E-006 emptied them: they were one player's); the last player's queued
+    commands and counts still end.
+  - **The move:** a phone that kept configurations sends them once after the table's have come (`merge: true`): they
+    are added behind the table's, without taking a quick slot or footswitch that is in use, and the phone notes that
+    it has moved them (`ge150-pro.configs.moved`). Its old copy is left in place, unused.
+  - **An older table** (no `ctx.store`): as before, the phone keeps them and they are one player's (E-006).
+  - Preset favourites are not part of this: nothing of the kind exists in the game yet.
+  *Checks:* `tests/ge150-pro.test.ts` (the table's list, the merge, a seat change), `tests/robustness.test.ts`,
+  `scripts/e2e/ge150_pro.py` (a phone's old configuration moves; the table keeps both) and `ge150_pro_flows.py` (the
+  next game has them).

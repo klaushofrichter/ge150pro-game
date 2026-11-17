@@ -1,11 +1,23 @@
 // GE150 Pro on the player's phone: a hands-free remote while playing. Play: the current preset, stepping presets, and
 // eight quick slots that recall configurations. Rhythm: the pedal's drum machine (shown; it is started on the pedal)
 // and the table's click track (started here). Pedal: the connection, the configurations, Finish. The configurations
-// live in this phone's browser between games: sent to the game once, kept up to date from it (E-006).
+// are the table's, kept in its game data and brought to the game by the board (E-017); ones this phone kept before
+// that move to the table once. On a table without game data (an older platform) they live in this phone's browser
+// between games: sent to the game once, kept up to date from it (E-006).
 import { esc, useStyles } from "/shared/board-kit.js";
 
 const ID = "ge150-pro";
 const STORE = "ge150-pro.configs";
+const MOVED = "ge150-pro.configs.moved"; // this phone's configurations have gone to the table
+
+function moved(set) {
+  try {
+    if (set) localStorage.setItem(MOVED, "1");
+    return localStorage.getItem(MOVED) === "1";
+  } catch {
+    return true; // (no storage: nothing to move)
+  }
+}
 
 function stored() {
   try {
@@ -210,7 +222,16 @@ export function mount(root, ctx) {
   return {
     update(v) {
       view = v;
-      if (!v.synced) {
+      if (ctx.store) {
+        // The table keeps the configurations and the board has brought them (E-017): what this phone kept before
+        // joins them, once, and from then on the phone keeps nothing.
+        if (v.shared && !sent && !v.done && !moved()) {
+          sent = true;
+          const list = stored();
+          if (!list.length) moved(true);
+          else Promise.resolve(ctx.send("configs", { list, merge: true })).then((r) => (r?.ok ? moved(true) : (sent = false)));
+        }
+      } else if (!v.synced) {
         // the game has none of this player's configurations yet (a new game, or another player took the seat)
         if (!sent && !v.done) {
           sent = true;

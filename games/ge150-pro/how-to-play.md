@@ -41,7 +41,9 @@ the modules it sets (the ones you changed are marked), whether it first selects 
 - a **quick slot** (1 to 8) on your phone's **Play** tab: tap the slot while you play;
 - a **footswitch**: when you select this preset with the pedal's footswitch, the configuration is applied right after.
 
-Your phone keeps your configurations between games, and you can rename or delete them on its **Pedal** tab.
+The table keeps the configurations between games, for everyone who plays here; rename or delete them on your phone's
+**Pedal** tab. (Ones an earlier version kept on your phone move to the table the first time you play.) The table's
+people can export, import or delete them all under **Advanced › Game data** on the board.
 
 ## Rhythm
 

@@ -131,6 +131,34 @@ describe("GE150 Pro", () => {
     expect((rt.boardView() as any).configs).toHaveLength(2);
   });
 
+  it("takes the table's configurations from the board, a phone's old ones on top, and keeps them when the seat changes hands (E-017)", () => {
+    const { rt } = connected();
+    const ids = () => (rt.boardView() as any).configs.map((c: any) => [c.id, c.slot, c.trigger]);
+    expect(rt.boardView()).toMatchObject({ synced: false, shared: false });
+    rt.submit(0, { name: "capture", payload: { config: config("new", { slot: 2 }) } }, "board"); // before the table's came
+    // a phone's old ones wait for the table's
+    rt.submit(0, { name: "configs", payload: { list: [config("phone-early")], merge: true } }, "human");
+    expect(ids()).toEqual([["new", 2, null], ["phone-early", null, null]]); // (taken as the first list: no table's yet)
+    expect(rt.submit(0, { name: "configs", payload: { list: [config("table-a", { slot: 2, trigger: 7 }), config("new"), { bad: true }], shared: true } }, "board")).toEqual({ ok: true });
+    expect(rt.boardView()).toMatchObject({ synced: true, shared: true });
+    expect(ids()).toEqual([["new", 2, null], ["phone-early", null, null], ["table-a", null, 7]]);
+    // the table's come once; a phone's old ones are added once they are here, without taking a slot that is in use
+    rt.submit(0, { name: "configs", payload: { list: [config("table-late")], shared: true } }, "board");
+    rt.submit(0, { name: "configs", payload: { list: [config("no-merge")] } }, "human");
+    expect(ids()).toHaveLength(3);
+    rt.submit(0, { name: "configs", payload: { list: [config("phone-old", { slot: 2, trigger: 9 }), config("table-a")], merge: true } }, "human");
+    expect(ids()).toEqual([["new", 2, null], ["phone-early", null, null], ["table-a", null, 7], ["phone-old", null, 9]]);
+    const before = rt.state;
+    rt.submit(0, { name: "configs", payload: { list: [config("phone-old")], merge: true } }, "human"); // again: nothing new
+    expect(rt.state).toBe(before);
+    // another person at the table: the table's configurations stay; the last player's commands and counts end
+    rt.submit(0, { name: "apply", payload: { id: "new" } }, "human");
+    rt.seatChanged({ seat: 0, playerId: "p9", name: "Zoe", kind: "human", edge: "south" });
+    const st = rt.state as any;
+    expect(st).toMatchObject({ player: "Zoe", shared: true, synced: true, commands: [], stats: { recalls: 0, applied: 0, switched: 0, captured: 0 } });
+    expect(st.configs.map((c: any) => c.id)).toEqual(["new", "phone-early", "table-a", "phone-old"]);
+  });
+
   it("counts footswitch selections and the configurations they applied", () => {
     const { rt } = connected();
     rt.submit(0, { name: "capture", payload: { config: config("a", { trigger: 9 }) } }, "board");
