@@ -121,23 +121,42 @@ export function mount(root, ctx) {
   const forTable = (configs) => (configs ?? []).map(({ id, name, slot, trigger, preset, modules }) => ({ id, name, slot, trigger, preset, modules }));
   let tableAsked = false;
   let tableHas = null; // the table's copy, as JSON
+  let tableWriting = false;
+  let tableRetry = null;
   async function syncTable() {
-    if (!ctx.store || !plays() || view.done) return;
+    if (dead || !ctx.store || !plays() || view.done) return;
     if (!view.shared) {
       if (tableAsked) return;
       tableAsked = true;
-      const stored = await ctx.store.get("configs");
-      const list = Array.isArray(stored) ? stored : [];
-      tableHas = JSON.stringify(list);
-      const r = await ctx.act(playerSeat(), "configs", { list, shared: true });
-      if (!r?.ok) tableAsked = false; // (asked again with the next update)
+      try {
+        // A table that can't be asked just now throws (games-service D-304): asked again with the next update, never
+        // taken for a table without configurations, which would later be written over the ones it keeps.
+        const stored = await ctx.store.get("configs");
+        const list = Array.isArray(stored) ? stored : [];
+        tableHas = JSON.stringify(list); // what the table has, as read
+        const r = await ctx.act(playerSeat(), "configs", { list, shared: true });
+        if (!r?.ok) tableAsked = false;
+      } catch {
+        tableAsked = false;
+      }
+      // not brought (the table could not be asked, the move was refused): again with the next update, or by itself
+      clearTimeout(tableRetry);
+      if (!tableAsked) tableRetry = setTimeout(syncTable, 3000);
       return;
     }
     const now = JSON.stringify(forTable(view.configs));
-    if (now === tableHas) return;
-    tableHas = now;
-    const r = await ctx.store.set("configs", JSON.parse(now));
-    if (!r?.ok) notice(`The configurations could not be saved on the table${r?.reason ? `: ${r.reason}` : ""}`);
+    if (now === tableHas || tableWriting) return;
+    tableWriting = true;
+    const r = await ctx.store.set("configs", JSON.parse(now)).catch((e) => ({ ok: false, reason: e?.message }));
+    tableWriting = false;
+    clearTimeout(tableRetry);
+    if (r?.ok) {
+      tableHas = now; // the table has it; only now
+      return void syncTable(); // (what changed while it was being written)
+    }
+    // Not saved (too many changes at once, the connection): said, and tried again, also when nothing else changes.
+    notice(`The configurations could not be saved on the table${r?.reason ? `: ${r.reason}` : ""}; trying again`);
+    tableRetry = setTimeout(syncTable, 3000);
   }
 
   // ---- reports to the rules -------------------------------------------------------------------------------------
@@ -823,6 +842,7 @@ export function mount(root, ctx) {
     },
     destroy() {
       dead = true;
+      clearTimeout(tableRetry);
       if (live === inst) live = null;
       clearTimeout(reportTimer);
       clearTimeout(noticeTimer);
