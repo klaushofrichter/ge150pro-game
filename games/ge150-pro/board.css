@@ -20,9 +20,15 @@
 .gp-conn-text { font-size: 19px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gp-dot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--ink-faint); box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35); }
 .gp-dot[data-state="on"] { background: var(--jade); box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), 0 0 12px var(--jade); }
-.gp-now { display: flex; align-items: baseline; justify-content: center; gap: 18px; min-width: 0; }
+.gp-now { grid-column: 2; display: flex; align-items: baseline; justify-content: center; gap: 18px; min-width: 0; }
 .gp-label { font-size: 22px; font-weight: 700; letter-spacing: 0.22em; color: var(--brass); }
 .gp-name { font-family: var(--display); font-weight: 600; font-size: 44px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Turned to a north player, the board's bottom edge is the table's top: the connection and Save keep their places at
+   the top of the screen (only turned), clear of the platform's buttons in the bottom corners. The preset name stays in
+   the bar, between those buttons. Box coordinates: 1080 − 18 − 72 = 990 from the top, the bar itself starts at 18. */
+.gp-north .gp-conn { position: absolute; top: 972px; right: 0; width: 540px; height: 72px; justify-content: flex-end; }
+.gp-north .gp-bar-right { position: absolute; top: 972px; left: 0; height: 72px; display: flex; align-items: center; }
 
 /* The signal chain on a playing surface (the board games' rim: dark wood, a brass ring): nine modules in the pedal's
    order; a module that is on is lit in brass. */

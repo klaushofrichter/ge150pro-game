@@ -132,3 +132,7 @@ Records are history: an older record is not edited when a newer one changes it. 
   - **A write the table refused was never tried again** (too many changes at once, a dropped connection): the board
     noted the list as saved before it was. It now notes it once the table has it, says when saving failed, and tries
     again, also when nothing else changes.
+- **E-019 · 2026-11-17 · Klaus** — With the board turned to a north player, the connection status and Save keep their
+  places at the top of the screen, turned in place, instead of moving to the bottom edge with the rest of the board,
+  where they overlapped the platform's Lobby, settings and rotate buttons. The preset name stays in the bar (at the
+  bottom between those buttons). The browser check turns the board north and checks both stay at the top.
