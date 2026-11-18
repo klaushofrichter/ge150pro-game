@@ -156,3 +156,11 @@ Records are history: an older record is not edited when a newer one changes it. 
   configuration's **Apply** is **Load**. Tapping a configuration's name opens what it sets: the preset it selects (or
   the one playing), its quick slot and footswitch, and each stored module with its switch, model and values (the other
   modules stay as they are), with Load and Close.
+- **E-023 · 2026-11-17 · Klaus** — The board's Configurations tab gets **Save all to file…** (one JSON file with every
+  configuration, `format: "ge150-pro-configurations"`) and **Load all from file…**, which replaces the configurations
+  the table keeps (rules: `configs` with `replace: true`; quick slots and footswitches settled; a file with nothing
+  usable is refused). Both ask first. **✕** asks before deleting, on the board and the phone, since a configuration
+  is gone for everyone at the table. *Fixed on the way (Claude):* Save configuration… left its click handler on the
+  board's sheet container, so the next sheet's confirm button (Save preset…, a configuration's details) also saved
+  the configuration again; every sheet now starts without it. The browser check covers it (a file save after a
+  capture would add a third configuration).

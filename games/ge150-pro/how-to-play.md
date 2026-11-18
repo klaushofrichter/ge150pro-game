@@ -36,6 +36,8 @@ board says so and changes nothing on the pedal: update it with Mooer's editor.
   switch** or **Cancel**. The other screen waits for the answer. The pedal's own footswitches never ask.
 - **Configurations** lists your saved configurations: tap a name to see what it sets (preset, slot, footswitch, each
   module's model and values); **Load** sets it on the pedal now, as unsaved changes.
+  **Save all to file…** saves every configuration in one file on the table's computer; **Load all from file…** brings
+  such a file back and replaces the configurations the table keeps (both ask first). **✕** deletes one, after asking.
 
 ## Configurations and quick slots
 

@@ -143,6 +143,36 @@ def main():
             board.locator(".gp-sheet .gp-no").click()
             assert board.locator(".gp-apply").first.inner_text() == "Load"
 
+            # E-023: all configurations to one file and back; X asks before deleting, on the board and the phone.
+            board.locator(".gp-file-save").click()
+            with board.expect_download() as dl:
+                board.locator(".gp-sheet .gp-yes").click()
+            saved = json.loads(open(dl.value.path()).read())
+            assert saved["format"] == "ge150-pro-configurations" and len(saved["configs"]) == 2, saved
+            board.locator(".gp-delete").first.click()
+            board.wait_for_selector(".gp-sheet .gp-yes")
+            assert "Delete" in board.locator(".gp-sheet-title").inner_text()
+            board.locator(".gp-sheet .gp-no").click()
+            assert board.locator(".gp-config").count() == 2, "Cancel keeps the configuration"
+            board.locator(".gp-delete").first.click()
+            board.locator(".gp-sheet .gp-yes").click()
+            wait(lambda: board.locator(".gp-config").count() == 1, 5, "the board's delete")
+            deck.locator(".gd-tab[data-tab=setup]").click()
+            deck.locator(".gd-delete").first.click()
+            wait(lambda: deck.locator(".gd-del-wrap").is_visible(), 5, "the phone to ask before deleting")
+            deck.locator(".gd-del-no").click()
+            assert deck.locator(".gd-config").count() == 1, "Cancel on the phone keeps it"
+            deck.locator(".gd-delete").first.click()
+            deck.locator(".gd-del-yes").click()
+            wait(lambda: board.locator(".gp-config").count() == 0, 5, "the phone's delete")
+            deck.locator(".gd-tab[data-tab=play]").click()
+            board.locator(".gp-file-input").set_input_files(dl.value.path())
+            board.wait_for_selector(".gp-sheet .gp-yes")
+            assert "Load 2 configurations" in board.locator(".gp-sheet-title").inner_text()
+            board.locator(".gp-sheet .gp-yes").click()
+            wait(lambda: board.locator(".gp-config").count() == 2, 5, "the file's configurations back on the board")
+            wait(lambda: deck.locator(".gd-slot:not(.empty)").count() == 2, 5, "and on the phone's quick slots")
+
             # The phone: ▶ selects 2B on the pedal; quick slot 1 recalls the configuration there.
             deck.locator(".gd-next").click()
             wait(lambda: board.evaluate("() => window.__pedal.state.current") == 6, 5, "the pedal to switch to 2B")
@@ -184,7 +214,7 @@ def main():
             start_at = board.evaluate("() => window.__pedal.state.current")
             stores = sent(board, 0xc3)
             deck.locator(".gd-next").click()
-            wait(lambda: deck.locator(".gd-ask-wrap").is_visible(), 5, "the phone to ask first")
+            wait(lambda: deck.locator(".gd-switch-wrap").is_visible(), 5, "the phone to ask first")
             wait(lambda: board.locator(".gp-preset").first.is_disabled(), 5, "the board's presets to wait for the phone")
             assert "phone is asking" in board.locator(".gp-presets-hint").inner_text()
             assert board.evaluate("() => window.__pedal.state.current") == start_at, "nothing switched while asking"

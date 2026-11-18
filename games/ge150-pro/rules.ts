@@ -373,6 +373,18 @@ export default defineGame<State>({
       }
       // ---- from the phone -------------------------------------------------------------------------------------
       case "configs": {
+        // All configurations from a file, loaded on the board (E-023): they replace the ones kept, quick slots and
+        // footswitches settled newest first.
+        if (p.replace === true) {
+          const sent = Array.isArray(p.list) ? p.list : [];
+          let configs: Config[] = [];
+          for (const raw of sent) {
+            const c = parseConfig(raw);
+            if (c && !configs.some((x) => x.id === c.id) && configs.length < MAX_CONFIGS) configs = settle([...configs, c], c);
+          }
+          if (sent.length && !configs.length) return { reject: "The file holds no configurations this game can use" };
+          return { state: { ...state, configs, synced: true } };
+        }
         // The configurations from earlier games: the table's, sent by the board (`shared`, E-017), or on a table
         // without game data the phone's, once per player. Ones made before they came stay (newer). `merge` adds a
         // phone's old ones to the table's, once the table's are here (the move from the phone to the table).
