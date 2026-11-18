@@ -804,7 +804,7 @@ export function mount(root, ctx) {
   function askDisconnect() {
     if (!plays() || !dev || state.key !== "connected") return;
     const unsaved = modifiedNow() ? " The unsaved changes stay on the pedal until it switches presets; Save preset… keeps them." : "";
-    ask("Disconnect the pedal?", `The table lets go of the GE150 Pro, so Mooer's editor or the GE150 Pro Editor web app can use it. The pedal keeps playing.${unsaved} Connect pedal connects again.`, "Disconnect", () => {
+    ask("Disconnect the pedal?", `The table lets go of the GE150 Pro, so Mooer's editor or the GE150 Pro Editor web app (klaushofrichter.github.io/ge150pro-editor) can use it. The pedal keeps playing.${unsaved} Connect pedal connects again.`, "Disconnect", () => {
       released = true;
       const d = dev;
       reset();
