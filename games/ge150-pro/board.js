@@ -72,6 +72,7 @@ export function mount(root, ctx) {
       <section class="gp-editor">
         <div class="gp-ed-head"><div><div class="gp-ed-slot"></div><button class="gp-btn gp-model" type="button"></button></div>
           <button class="gp-power gp-ed-power" type="button" aria-label="Switch the module on or off"></button></div>
+        <div class="gp-exp-note muted" hidden>The pedal is in volume mode: EXP sets the volume until its toe switch selects EXP mode.</div>
         <div class="gp-faders"></div>
         <div class="gp-notice" hidden><div class="gp-notice-title"></div><div class="gp-notice-text"></div>
           <button class="gp-btn primary gp-notice-connect" type="button" hidden>Connect pedal</button>
@@ -195,9 +196,12 @@ export function mount(root, ctx) {
   /** The live modules as Save keeps them: without the expression pedal's position (playing, not an edit). */
   const kept = () => {
     const base = stored.get(current);
-    return base && modules ? lib.withoutPedalMove(base.exp, modules, base.modules) : modules;
+    // (the pedal moves what it controls now: the live EXP target, which may not be stored yet)
+    return base && modules ? lib.withoutPedalMove(exp?.MODULE_CTRL !== undefined ? exp : base.exp, modules, base.modules) : modules;
   };
-  const modifiedNow = () => !!modules && !!stored.get(current) && kept().some((m, s) => !sameModule(m, stored.get(current).modules[s]));
+  /** The EXP target differs from the stored preset's (E-027): an unsaved change like a module's. */
+  const expChanged = () => !!exp && !!stored.get(current) && (exp.MODULE_CTRL !== stored.get(current).exp.MODULE_CTRL || exp.PARA_CTRL !== stored.get(current).exp.PARA_CTRL);
+  const modifiedNow = () => !!modules && !!stored.get(current) && (expChanged() || kept().some((m, s) => !sameModule(m, stored.get(current).modules[s])));
 
   // ---- the pedal ------------------------------------------------------------------------------------------------
   async function loadLib() {
@@ -340,6 +344,7 @@ export function mount(root, ctx) {
     d.on("exp", (patch) => {
       exp = { ...(exp ?? {}), ...patch };
       reportExp();
+      draw(); // the EXP badge, toggles and modified mark follow the pedal's report
     });
     d.on("rhythm", (r) => {
       rhythm = r;
@@ -349,7 +354,9 @@ export function mount(root, ctx) {
     d.on("stored", (i) => {
       if (i === current && modules) {
         const keep = kept();
-        stored.set(i, { ...stored.get(i), modules: structuredClone(keep) });
+        const was = stored.get(i);
+        // as storeCurrent sent it: the live EXP target and volume range, the preset's own toe-switch mode (E-027)
+        stored.set(i, { ...was, modules: structuredClone(keep), exp: { ...was.exp, ...(exp ?? {}), FUN_SWITCH: was.exp.FUN_SWITCH } });
         // storing also loads the stored values into the sound: put back the value the expression pedal had set
         const moved = keep.findIndex((m, s) => !sameModule(m, modules[s]));
         if (moved >= 0) {
@@ -379,6 +386,34 @@ export function mount(root, ctx) {
     report({ current: index, ...(modules ? { chain: chainOf(modules), modified: modifiedNow() } : {}) });
     reportExp();
     draw();
+  }
+
+  /** The EXP target of this board's pedal (null on a remote board, which has only the phone's label). */
+  const expOf = () => (plays() && exp?.MODULE_CTRL !== undefined ? exp : null);
+
+  /**
+   * The expression pedal controls this slider of the open module from now on, in EXP mode (E-027). One target per
+   * preset: it moves here from wherever it was, without asking; an unsaved change until Save preset….
+   */
+  function assignExp(i) {
+    if (!canEdit() || !exp) return;
+    const p = lib.model(selected, modules[selected].type)?.params[i];
+    const id = p && lib.expParamId(selected, p.name);
+    if (id === undefined || (exp.MODULE_CTRL === selected && exp.PARA_CTRL === id)) return;
+    exp = { ...exp, MODULE_CTRL: selected, PARA_CTRL: id };
+    const e = { MODULE_CTRL: exp.MODULE_CTRL, PARA_CTRL: exp.PARA_CTRL, FUN_SWITCH: exp.FUN_SWITCH ?? 1 };
+    afterLiveChange();
+    later(async () => {
+      try {
+        await dev?.setExpFunction(e);
+      } catch {
+        return notice("the EXP target did not reach the pedal");
+      }
+      // a read of the live state still running when the toggle was tapped (after a switch) put back the stored
+      // target: the pedal has this one now, so show it again
+      exp = { ...exp, MODULE_CTRL: e.MODULE_CTRL, PARA_CTRL: e.PARA_CTRL };
+      afterLiveChange();
+    });
   }
 
   function afterLiveChange() {
@@ -559,7 +594,9 @@ export function mount(root, ctx) {
       const m = chain?.[s];
       const slotName = lib?.catalog.slots[s].name ?? "";
       const modelName = m && lib ? lib.model(s, m.type)?.name ?? `model ${m.type + 1}` : "";
+      const expHere = expOf()?.MODULE_CTRL === s;
       return `<div class="gp-tile ${m?.on ? "on" : ""} ${s === selected ? "sel" : ""}" role="listitem" data-slot="${s}">
+        ${expHere ? `<span class="gp-exp-badge" title="The expression pedal controls ${esc(lib.expLabel(expOf()))} in EXP mode">EXP</span>` : ""}
         <button class="gp-tile-body" type="button" data-slot="${s}"><span class="gp-tile-slot">${esc(slotName)}</span>
           <span class="gp-tile-model">${esc(modelName)}</span></button>
         <button class="gp-power" type="button" data-power="${s}" aria-label="${esc(slotName)} on or off" aria-pressed="${!!m?.on}" ${canEdit() ? "" : "disabled"}></button></div>`;
@@ -598,7 +635,8 @@ export function mount(root, ctx) {
           <div class="gp-f-track" data-i="${i}"><div class="gp-f-fill"></div><div class="gp-f-knob"></div></div>
           <div class="gp-f-name">${esc(p.name)}</div>
           <div class="gp-f-step"><button type="button" class="gp-btn gp-f-dec" data-i="${i}" aria-label="Less ${esc(p.name)}">−</button>
-            <button type="button" class="gp-btn gp-f-inc" data-i="${i}" aria-label="More ${esc(p.name)}">+</button></div></div>`)
+            <button type="button" class="gp-btn gp-f-inc" data-i="${i}" aria-label="More ${esc(p.name)}">+</button></div>
+          ${lib.expParamId(selected, p.name) !== undefined ? `<button type="button" class="gp-btn gp-f-exp" data-i="${i}" aria-pressed="false" aria-label="Expression pedal controls ${esc(p.name)}">EXP</button>` : `<div class="gp-f-exp-none"></div>`}</div>`)
         .join("");
     }
     mm.params.forEach((p, i) => {
@@ -608,7 +646,15 @@ export function mount(root, ctx) {
       el.querySelector(".gp-f-value").textContent = lib.formatValue(p, raw);
       el.querySelector(".gp-f-fill").style.height = `${f * 100}%`;
       el.querySelector(".gp-f-knob").style.bottom = `calc(${f * 100}% - 14px)`; // (the track's margin keeps it off the name)
+      const xb = el.querySelector(".gp-f-exp");
+      if (xb) {
+        const on = !!exp && exp.MODULE_CTRL === selected && exp.PARA_CTRL === lib.expParamId(selected, p.name);
+        xb.setAttribute("aria-pressed", String(on));
+        // the target can only move, not go: the pedal always controls something in EXP mode
+        xb.disabled = !canEdit() || on || !exp;
+      }
     });
+    $(".gp-exp-note").hidden = !exp || exp.FUN_SWITCH === 1;
   }
 
   function drawPresets(nameOf, idx) {
@@ -1016,6 +1062,8 @@ export function mount(root, ctx) {
   faders.addEventListener("pointerup", endDrag);
   faders.addEventListener("pointercancel", endDrag);
   faders.addEventListener("click", (e) => {
+    const x = e.target.closest(".gp-f-exp");
+    if (x) return assignExp(Number(x.dataset.i));
     const b = e.target.closest(".gp-f-dec, .gp-f-inc");
     if (!b || !canEdit()) return;
     const i = Number(b.dataset.i);

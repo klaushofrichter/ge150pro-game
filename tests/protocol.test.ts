@@ -4,7 +4,7 @@ import { handshake, selectPreset, setModule } from '../src/ge150/commands.ts';
 import { decodeModule, decodePreset, encodePreset, presetLabel, PRESET_BODY_BYTES } from '../src/ge150/preset.ts';
 import { decodeRhythm, requestRhythm, styleName } from '../src/ge150/rhythm.ts';
 import { catalog, formatValue, rawRange } from '../src/ge150/catalog.ts';
-import { decodeExpReport, EXP_PARAMS, expLabel, expTarget, withoutPedalMove } from '../src/ge150/exp.ts';
+import { decodeExpReport, EXP_PARAMS, expLabel, expParamId, expTarget, setExpFunction, withoutPedalMove } from '../src/ge150/exp.ts';
 
 const hex = (s: string) => Uint8Array.from(s.replace(/\s+/g, '').match(/../g)!.map((b) => parseInt(b, 16)));
 const toHex = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
@@ -194,4 +194,16 @@ describe('parameter positions', () => {
     expect(pos(5, 'CUSTOM EQ')).toEqual({ GAIN1: 0, FREQ1: 6, GAIN2: 2, FREQ2: 7, GAIN3: 4, FREQ3: 8 });
   });
 
+});
+
+describe('assigning the expression pedal (E-027)', () => {
+  it('finds the PARA_CTRL id of a slider the pedal can control, and none for one it cannot', () => {
+    expect(expParamId(2, 'GAIN')).toBe(13); // AMP GAIN
+    expect(expParamId(3, 'Distance')).toBe(20); // CAB, any case
+    expect(expParamId(7, 'FEEDBACK')).toBe(52); // the catalog's FEEDBACK is the EXP menu's F.BACK
+    expect(expParamId(2, 'NO SUCH')).toBeUndefined();
+  });
+  it('sends 98 with MODULE_CTRL, PARA_CTRL and FUN_SWITCH as u16 LE, as the official editor does', () => {
+    expect([...setExpFunction({ MODULE_CTRL: 2, PARA_CTRL: 13, FUN_SWITCH: 1 })]).toEqual([...encodeMessage(0x98, Uint8Array.of(2, 0, 13, 0, 1, 0))]);
+  });
 });

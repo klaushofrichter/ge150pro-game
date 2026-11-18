@@ -262,6 +262,8 @@ function model(slot, type) {
 var ExpCmd = {
   /** MODULE_CTRL, PARA_CTRL, FUN_SWITCH (u16 LE each). */
   FUNCTION: 24,
+  /** The same three, from the host: what the official editor sends when its EXP target changes (E-027). */
+  SET_FUNCTION: 152,
   /** VOL_SWITCH, VOL_MIN, VOL_MAX (u16 LE each). */
   VOLUME: 51
 };
@@ -304,6 +306,15 @@ function expLabel(e) {
   return mod && para ? `${mod} \xB7 ${para.name}` : `${e.MODULE_CTRL} / ${e.PARA_CTRL}`;
 }
 var EXP_NAME = { FEEDBACK: "F.BACK" };
+function expParamId(slot, paramName) {
+  const name = EXP_NAME[paramName.toUpperCase()] ?? paramName.toUpperCase();
+  return EXP_PARAMS[slot]?.find((p) => p.name === name)?.id;
+}
+function setExpFunction(e) {
+  const b = new Uint8Array(6);
+  [e.MODULE_CTRL, e.PARA_CTRL, e.FUN_SWITCH].forEach((v, i) => (b[2 * i] = v & 255, b[2 * i + 1] = v >> 8 & 255));
+  return encodeMessage(ExpCmd.SET_FUNCTION, b);
+}
 function expTarget(e, type) {
   const name = EXP_PARAMS[e.MODULE_CTRL]?.find((p) => p.id === e.PARA_CTRL)?.name;
   const params = model(e.MODULE_CTRL, type)?.params ?? [];
@@ -509,6 +520,10 @@ var GE150Pro = class _GE150Pro {
   setModule(slot, m) {
     return this.write(setModule(slot, m));
   }
+  /** What the expression pedal controls in EXP mode (98, as the official editor sends it); live until stored. */
+  setExpFunction(e) {
+    return this.write(setExpFunction(e));
+  }
   /** Persist a full preset to its slot on the device. */
   storePreset(p) {
     return this.write(storePreset(p));
@@ -521,6 +536,7 @@ export {
   SLOT_COUNT,
   catalog,
   expLabel,
+  expParamId,
   expTarget,
   formatValue,
   model,
