@@ -78,6 +78,13 @@
   box-shadow: 0 0 0 2px var(--brass-deep), 0 4px 10px rgba(0, 0, 0, 0.55); pointer-events: none; }
 .gp-f-name { font-size: 15px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); text-align: center; min-height: 20px; }
 .gp-f-step { display: flex; gap: 6px; }
+/* EXP: which slider the expression pedal controls in EXP mode (E-027); one per preset */
+.gp-f-exp { min-height: 40px; padding: 0 14px; font-size: 15px; font-weight: 700; letter-spacing: 0.14em; }
+.gp-f-exp[aria-pressed="true"] { background: var(--brass); color: #1b1407; border-color: var(--brass); opacity: 1; }
+.gp-f-exp-none { min-height: 40px; }
+.gp-exp-badge { position: absolute; top: 8px; right: 10px; z-index: 1; padding: 1px 8px; border-radius: 999px; font-size: 12px;
+  font-weight: 700; letter-spacing: 0.14em; background: var(--brass); color: #1b1407; pointer-events: none; }
+.gp-exp-note { font-size: 16px; margin-top: 8px; }
 .gp-f-step .gp-btn { min-width: 54px; padding: 0; font-size: 26px; }
 .gp-empty { padding: 30px 6px; font-size: 22px; }
 

@@ -101,10 +101,15 @@
     } else if (cmd === 0xc3) {
       const i = p[0];
       for (let s = 0; s < 9; s++) presets[i - 1].modules[s] = readModule(p, 17 + s * 24);
+      presets[i - 1].exp = Array.from({ length: 6 }, (_, k) => p[17 + 9 * 24 + 2 * k] | (p[18 + 9 * 24 + 2 * k] << 8));
       reply(0x43, [i]);
     } else if (cmd === 0xb4) {
       reply(0x34, [p[0]]);
     } else if (cmd === 0x98 || cmd === 0xb3) {
+      // the EXP target (98) or the volume range (B3), live until stored
+      const v = [0, 2, 4].map((o) => p[o] | (p[o + 1] << 8));
+      if (cmd === 0x98) state.exp.splice(0, 3, ...v);
+      else state.exp.splice(3, 3, ...v);
       reply(0x34, [cmd === 0x98 ? 0x0f : 0x16]);
     }
     // anything else: the real pedal ignores codes it does not know; so does this one

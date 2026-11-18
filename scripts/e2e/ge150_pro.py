@@ -273,6 +273,30 @@ def main():
             assert sent(board, 0xc3) == stores + 1, "Discard and switch stores nothing"
             a("POST", "/game/prefs", {"prefs": {"confirm": False}})
 
+            # E-027: EXP on a slider moves the expression pedal's target there (98), the badge follows, and Save preset…
+            # stores it with the preset.
+            board.locator(".gp-tile-body[data-slot='2']").click()  # AMP
+            exp_before = board.evaluate("() => window.__pedal.state.exp.slice(0, 2)")
+            assert board.locator(".gp-tile[data-slot='2'] .gp-exp-badge").count() == 0, f"EXP is elsewhere first: {exp_before}"
+            assert board.locator(f".gp-tile[data-slot='{exp_before[0]}'] .gp-exp-badge").count() == 1, "the badge shows where EXP is"
+            gain = board.locator(".gp-fader[data-i='0'] .gp-f-exp")
+            assert gain.get_attribute("aria-pressed") == "false"
+            before = sent(board, 0x98)
+            gain.click()  # (right after the switch above: the board may still be reading the new preset)
+            wait(lambda: sent(board, 0x98) > before, 5, "the pedal to get the new EXP target")
+            assert board.evaluate("() => window.__pedal.state.exp.slice(0, 2)") == [2, 13], "AMP GAIN (13) is the target"
+            wait(lambda: board.locator(".gp-tile[data-slot='2'] .gp-exp-badge").count() == 1, 5, "the badge on AMP")
+            assert board.locator(".gp-exp-badge").count() == 1, "one target only"
+            assert gain.get_attribute("aria-pressed") == "true" and gain.is_disabled(), "the active one stays until another is chosen"
+            wait(lambda: board.locator(".gp-name").inner_text().endswith("*"), 5, "a new target is an unsaved change")
+            shot(board, "board-exp")
+            target_now = board.evaluate("() => window.__pedal.state.current")
+            board.locator(".gp-save").click()
+            board.locator(".gp-sheet .gp-yes").click()
+            wait(lambda: not board.locator(".gp-name").inner_text().endswith("*"), 5, "Save preset… to clear the mark")
+            stored_exp = board.evaluate("(i) => { const m = window.__pedal.log.filter((x) => x.cmd === 0xc3).at(-1).payload; return [m[17 + 216] | (m[18 + 216] << 8), m[19 + 216] | (m[20 + 216] << 8), m[0]]; }", target_now)
+            assert stored_exp == [2, 13, target_now], f"the preset stores the EXP target: {stored_exp}"
+
             # Rhythm: the pedal's drum machine by name, and the table's click.
             deck.locator(".gd-tab[data-tab=rhythm]").click()
             wait(lambda: "8 BEAT 4" in deck.locator(".gd-pr-style").inner_text(), 5, "the drum machine's style on the phone")

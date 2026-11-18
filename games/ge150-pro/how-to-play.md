@@ -33,6 +33,9 @@ board says so and changes nothing on the pedal: update it with Mooer's editor.
   its name to edit it below.
 - **The editor** shows the module's model (tap it to choose another) and a fader for each parameter: drag anywhere on
   a fader, or use **−** and **+**.
+- **EXP** under a fader makes the expression pedal control that value in EXP mode (the toe switch selects EXP or
+  volume mode). One value per preset: choosing another moves it there, and the chain shows an **EXP** badge on the
+  module that has it. Faders without EXP are values the pedal cannot control. **Save preset…** keeps the choice.
 - **Presets** selects a preset by bank and A–D, like the footswitches. Changes are live on the pedal and are lost when
   it switches presets, as on the pedal itself. **Save preset…** (top right) stores the current sound in its preset slot (it asks first).
   With **Confirm when changing presets after edits** on (the board's settings, off by default), switching with
