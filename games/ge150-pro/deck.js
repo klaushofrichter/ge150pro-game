@@ -80,7 +80,10 @@ export function mount(root, ctx) {
         <div class="gd-list"></div>
       </section>
     </div>
-    <div class="gd-ask-wrap" hidden><div class="card gd-ask" role="alertdialog" aria-labelledby="gd-ask-title">
+    <div class="gd-ask-wrap gd-del-wrap" hidden><div class="card gd-ask" role="alertdialog" aria-labelledby="gd-del-title">
+      <div class="gd-ask-title gd-del-title" id="gd-del-title"></div><div class="gd-ask-text gd-del-text muted"></div>
+      <div class="gd-ask-btns"><button type="button" class="gd-del-yes">Delete</button><button type="button" class="primary gd-del-no">Cancel</button></div></div></div>
+    <div class="gd-ask-wrap gd-switch-wrap" hidden><div class="card gd-ask" role="alertdialog" aria-labelledby="gd-ask-title">
       <div class="gd-ask-title" id="gd-ask-title"></div><div class="gd-ask-text muted"></div>
       <div class="gd-ask-btns"><button type="button" class="primary gd-ask-save">Save and switch</button>
         <button type="button" class="gd-ask-discard">Discard and switch</button><button type="button" class="gd-ask-cancel">Cancel</button></div></div></div>
@@ -190,19 +193,24 @@ export function mount(root, ctx) {
     ask = { intent, payload, current: p.current };
     $(".gd-ask-title").textContent = `Save the changes to ${from}?`;
     $(".gd-ask-text").textContent = `"${name}" has unsaved changes. ${to === from ? `Selecting ${to} again reloads it and` : `Switching to ${to}`} discards them, unless you save them to ${from} first.`;
-    $(".gd-ask-wrap").hidden = false;
+    $(".gd-switch-wrap").hidden = false;
     send("confirm", { from: "deck", on: true });
   }
   /** Answer the question: `save` (true/false) switches, null cancels. */
   function answer(save) {
     const a = ask;
     ask = null;
-    $(".gd-ask-wrap").hidden = true;
+    $(".gd-switch-wrap").hidden = true;
     if (!a) return;
     if (save === null) send("confirm", { from: "deck", on: false });
     else send(a.intent, { ...a.payload, ...(save ? { save: true } : {}) }); // (closes the question too)
   }
   $(".gd-ask-save").addEventListener("click", () => answer(true));
+  $(".gd-del-no").addEventListener("click", () => ($(".gd-del-wrap").hidden = true));
+  $(".gd-del-yes").addEventListener("click", () => {
+    $(".gd-del-wrap").hidden = true;
+    send("edit", { id: $(".gd-del-wrap").dataset.id, remove: true });
+  });
   $(".gd-ask-discard").addEventListener("click", () => answer(false));
   $(".gd-ask-cancel").addEventListener("click", () => answer(null));
   const stepTarget = (step) => (view?.pedal.current ? ((view.pedal.current - 1 + step + 400) % 200) + 1 : 0);
@@ -245,7 +253,14 @@ export function mount(root, ctx) {
       return;
     }
     const d = e.target.closest(".gd-delete");
-    if (d) send("edit", { id: d.dataset.id, remove: true });
+    const c = d && view.configs.find((x) => x.id === d.dataset.id);
+    if (!c) return;
+    // deleting takes it from the table for everyone, without undo: ask first (E-023)
+    const tags = (c.tags ?? []).filter((t) => !t.startsWith("on "));
+    $(".gd-del-title").textContent = `Delete "${c.name}"?`;
+    $(".gd-del-text").textContent = `${tags.length ? `It is on ${tags.join(" and ")}. ` : ""}It is gone for everyone who plays at this table.`;
+    $(".gd-del-wrap").dataset.id = c.id;
+    $(".gd-del-wrap").hidden = false;
   });
   return {
     update(v, _events, i) {

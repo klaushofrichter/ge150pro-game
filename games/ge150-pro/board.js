@@ -11,6 +11,8 @@ const NOTICE_MS = 4000; // how long a passing problem shows in the bar
 const VOLUMES = [0, 20, 40, 60, 80, 100];
 /** The oldest supported firmware (src/ge150/compat.ts MIN_FIRMWARE; the settings window needs it before the library loads). */
 const MIN_FIRMWARE = "V2.1.2";
+/** What Save all to file… writes, so Load all from file… recognizes it (E-023). */
+const FILE_FORMAT = "ge150-pro-configurations";
 /**
  * What the board says about the pedal, by state: the short title (the bar and the notice panel), the explanation
  * under it, and the full sentence the phone shows. `retry` offers Connect pedal.
@@ -88,7 +90,10 @@ export function mount(root, ctx) {
           <div class="gp-hint muted gp-presets-hint"></div>
         </div>
         <div class="gp-pane gp-configs" hidden>
-          <button class="gp-btn primary gp-capture" type="button">Save configuration…</button>
+          <div class="gp-config-btns"><button class="gp-btn primary gp-capture" type="button">Save configuration…</button>
+            <button class="gp-btn gp-file-save" type="button">Save all to file…</button>
+            <button class="gp-btn gp-file-load" type="button">Load all from file…</button>
+            <input class="gp-file-input" type="file" accept=".json,application/json" hidden></div>
           <div class="gp-config-list"></div>
         </div>
       </section>
@@ -592,6 +597,8 @@ export function mount(root, ctx) {
 
   function drawConfigs() {
     $(".gp-capture").disabled = !canEdit();
+    $(".gp-file-save").disabled = !plays() || !(view.configs ?? []).length;
+    $(".gp-file-load").disabled = !plays() || !!view.done;
     const rows = (view.configs ?? []).map((c) => {
       const what = Object.keys(c.modules).map((k) => lib?.catalog.slots[Number(k)].name ?? k).join(", ");
       const tags = c.tags ?? [];
@@ -607,6 +614,8 @@ export function mount(root, ctx) {
   // ---- sheets ----------------------------------------------------------------------------------------------------
   function openSheet(inner, wire) {
     const wrap = $(".gp-sheet-wrap");
+    // a sheet's own handler on the container (Save configuration…) must not answer the next sheet's buttons
+    $(".gp-sheet").onclick = null;
     $(".gp-sheet").innerHTML = inner;
     wrap.hidden = false;
     wire($(".gp-sheet"));
@@ -682,6 +691,64 @@ export function mount(root, ctx) {
           closeSheet();
           later(storeCurrent);
         };
+      },
+    );
+  }
+
+  /** A small question in the board's sheet: Cancel and one action. */
+  function ask(title, text, action, run) {
+    openSheet(
+      `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(title)}</div></div><p class="gp-sheet-text">${esc(text)}</p>
+      <div class="gp-sheet-btns"><button type="button" class="gp-btn gp-no">Cancel</button><button type="button" class="gp-btn primary gp-yes">${esc(action)}</button></div>`,
+      (el) => {
+        el.querySelector(".gp-no").onclick = closeSheet;
+        el.querySelector(".gp-yes").onclick = () => (closeSheet(), run());
+      },
+    );
+  }
+
+  /** Deleting a configuration takes it from the table for everyone, without undo: ask first (E-023). */
+  function confirmDelete(c) {
+    const tags = (c.tags ?? []).filter((t) => !t.startsWith("on "));
+    ask(`Delete "${c.name}"?`, `${tags.length ? `It is on ${tags.join(" and ")}. ` : ""}It is gone for everyone who plays at this table; a file saved before keeps it.`, "Delete", () => {
+      if (plays()) ctx.act(playerSeat(), "edit", { id: c.id, remove: true });
+    });
+  }
+
+  /** All configurations into one file on this computer (E-023). */
+  function saveFile() {
+    const list = forTable(view.configs);
+    if (!list.length) return;
+    ask(`Save all ${list.length} configurations to a file?`, "The browser saves one file with every configuration. Load all from file… brings them back, here or on another table.", "Save to file", () => {
+      const blob = new Blob([JSON.stringify({ format: FILE_FORMAT, version: 1, configs: list }, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `ge150-pro-configurations-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+  }
+
+  /** A file chosen with Load all from file…: after asking, its configurations replace the table's (E-023). */
+  async function loadFile(file) {
+    let list;
+    try {
+      const data = JSON.parse(await file.text());
+      list = Array.isArray(data) ? data : data?.format === FILE_FORMAT && Array.isArray(data.configs) ? data.configs : null;
+    } catch {
+      list = null;
+    }
+    if (!list) return ask("Not a configurations file", `${file.name} is not a file saved with Save all to file….`, "OK", () => {});
+    const have = (view.configs ?? []).length;
+    ask(
+      `Load ${list.length} configurations from ${file.name}?`,
+      `They replace ${have ? `the ${have} configurations` : "the configurations"} this table keeps, for everyone who plays here, quick slots and footswitches included.${have ? " Save all to file… first keeps the current ones." : ""}`,
+      "Load all",
+      async () => {
+        const r = await ctx.act(playerSeat(), "configs", { list, replace: true });
+        if (r && !r.ok) ask("Not loaded", r.reason || "The game did not take the file.", "OK", () => {});
       },
     );
   }
@@ -800,6 +867,13 @@ export function mount(root, ctx) {
   $(".gp-save").addEventListener("click", openSave);
   $(".gp-model").addEventListener("click", openModels);
   $(".gp-capture").addEventListener("click", openCapture);
+  $(".gp-file-save").addEventListener("click", saveFile);
+  $(".gp-file-load").addEventListener("click", () => $(".gp-file-input").click());
+  $(".gp-file-input").addEventListener("change", (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (f) loadFile(f);
+  });
   $(".gp-sheet-wrap").addEventListener("click", (e) => e.target === $(".gp-sheet-wrap") && closeSheet());
   box.querySelector(".gp-tabs").addEventListener("click", (e) => {
     const t = e.target.closest(".gp-tab");
@@ -835,7 +909,10 @@ export function mount(root, ctx) {
       return;
     }
     const d = e.target.closest(".gp-delete");
-    if (d && plays()) ctx.act(playerSeat(), "edit", { id: d.dataset.id, remove: true });
+    if (d && plays()) {
+      const c = view.configs.find((x) => x.id === d.dataset.id);
+      if (c) confirmDelete(c);
+    }
   });
   // faders: drag anywhere on the track; − and + step by one
   const faders = $(".gp-faders");
