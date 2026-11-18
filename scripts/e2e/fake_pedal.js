@@ -30,7 +30,8 @@
   const presets = Array.from({ length: 200 }, (_, i) => ({
     name: `Preset ${i + 1}`.padEnd(16, "\0").slice(0, 16),
     modules: Array.from({ length: 9 }, (_, s) => ({ on: (s + i) % 2 === 0, type: s % 3, values: [50, 50, 50, 0, 0, 0, 0, 0, 0, 0] })),
-    exp: [8, 57, 1, 1, 0, 100],
+    // bank 14 (53-56): another EXP target, in volume mode
+    exp: i >= 52 && i < 56 ? [2, 13, 0, 1, 0, 100] : [8, 57, 1, 1, 0, 100],
   }));
   const LOAD_MS = 120;
   let loading;
@@ -91,12 +92,12 @@
       state.live[cmd - 0x82] = readModule(p);
     } else if (cmd === 0x96) {
       // like the hardware: the number switches at once, the modules load later (100-150 ms measured), and a module set
-      // in between is overwritten by the load
+      // in between is overwritten by the load. The EXP target and mode stay from before (USB captures, E-030): only a
+      // footswitch loads the preset's own
       state.current = p[0];
       clearTimeout(loading);
       loading = setTimeout(() => {
         state.live = structuredClone(presets[p[0] - 1].modules);
-        state.exp = [...presets[p[0] - 1].exp];
       }, LOAD_MS);
     } else if (cmd === 0xc3) {
       const i = p[0];
@@ -195,6 +196,7 @@
     press(i) {
       state.current = i;
       state.live = structuredClone(presets[i - 1].modules);
+      state.exp = [...presets[i - 1].exp];
       reply(0x16, [i]);
     },
     /** A footswitch press reported twice in one report, the first copy with a broken CRC (a damaged transfer). */

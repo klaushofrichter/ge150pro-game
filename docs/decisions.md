@@ -207,3 +207,13 @@ Records are history: an older record is not edited when a newer one changes it. 
   where the table has it, so an older table still runs the game with the browser's bar.
   *2026-11-18 later (Klaus):* the configuration list, a configuration's details and the preset view scroll with the
   wide bar too.
+- **E-030 · 2026-11-18 · Klaus** — In the banks window a preset selects it on the pedal (asking about unsaved
+  changes, as A–D do); a bank's number only shows that bank. The bank shown on the right and the playing preset are
+  marked clearly (filled), the playing one with * for unsaved changes. **Reload saved** (after asking) selects the
+  playing preset again, which drops its unsaved changes (only the playing preset can have any). The preset view marks
+  unsaved changes in brass with the saved value, and **Reset** goes back to the saved preset. *Implementation
+  (Claude):* why a preset selected on the board showed * at once: the USB captures show that a footswitch loads the
+  preset's EXP target and mode (`18` right after `16`), while a selection from the host (`96`) keeps the ones from
+  before (a later `B0` reports the earlier preset's target). The board now sends the preset's own target and mode
+  (`98`) after a selection when they differ. *Inferred* from the captures; the EXP volume range (`B3`) is not
+  restored.
