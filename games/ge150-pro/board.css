@@ -121,7 +121,8 @@
 .gp-preset.on { border: 2px solid var(--brass); background: rgba(214, 169, 74, 0.14); }
 .gp-hint { font-size: 17px; }
 .gp-config-btns { display: flex; flex-wrap: wrap; gap: 10px; }
-.gp-config-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.gp-config-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; position: relative; }
+.gp-config-list.scrolls { padding-right: 40px; }
 .gp-config { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 18px; border-radius: 16px;
   background: rgba(255, 255, 255, 0.04); border: 1px solid var(--felt-line); }
 .gp-config-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
@@ -144,7 +145,8 @@
 /* a sheet's list scrolls by itself under its title, with the platform's wide bar (D-306) and room for it */
 .gp-scroll { overflow-y: auto; min-height: 0; flex: 1 1 auto; position: relative; }
 .gp-scroll.scrolls { padding-right: 44px; }
-.gp-models > .scroll-rail { grid-column: 1 / -1; margin-bottom: -10px; } /* (the bar's rail is not a model) */
+.gp-scroll > .scroll-rail { grid-column: 1 / -1; } /* (the bar's rail is no grid cell) */
+.gp-models > .scroll-rail { margin-bottom: -10px; }
 .gp-sheet:has(.gp-scroll) { overflow: hidden; }
 /* the banks (E-029): a row per bank, its number and A–D */
 .gp-banks { display: flex; flex-direction: column; gap: 8px; }

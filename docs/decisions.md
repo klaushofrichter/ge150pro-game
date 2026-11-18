@@ -205,3 +205,5 @@ Records are history: an older record is not edited when a newer one changes it. 
   model window scroll with the platform's wide bar for a finger (`touchScroll`, games-service D-306) instead of the
   browser's thin one. *Implementation (Claude):* the board kit is imported as a namespace and `touchScroll` used only
   where the table has it, so an older table still runs the game with the browser's bar.
+  *2026-11-18 later (Klaus):* the configuration list, a configuration's details and the preset view scroll with the
+  wide bar too.
