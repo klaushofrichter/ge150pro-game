@@ -9,7 +9,7 @@ the pedal: your guitar plays through the pedal as always.
 - The **board** shapes the sound: modules, models, parameters, presets.
 - **Save configuration…** puts a sound on a phone **quick slot** or a footswitch.
 - The **phone** recalls quick slots, runs a click and shows the drum machine.
-- **Finish** on the phone ends the session.
+- Leave the game through the player tab at the top of your phone.
 
 ![The board with the signal chain, faders and presets; the phone with quick slots](assets/img/layout.svg)
 
@@ -38,7 +38,7 @@ board says so and changes nothing on the pedal: update it with Mooer's editor.
 A configuration is a set of modules exactly as they are now, saved from the board with **Save configuration…**. Choose
 the modules it sets (the ones you changed are marked), whether it first selects the current preset, and where it goes:
 
-- a **quick slot** (1 to 8) on your phone's **Play** tab: tap the slot while you play;
+- a **quick slot** (1 to 8) on your phone's **Preset** tab: tap the slot while you play;
 - a **footswitch**: when you select this preset with the pedal's footswitch, the configuration is applied right after.
 
 The table keeps the configurations between games, for everyone who plays here; rename or delete them on your phone's
