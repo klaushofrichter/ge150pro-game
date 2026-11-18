@@ -256,17 +256,21 @@ export function mount(root, ctx) {
     }
   }
 
-  /** Back to fullscreen: at once if the browser still allows it, else with the next touch anywhere on the page. */
+  /**
+   * Back to fullscreen: at once if the browser still allows it, else with the next touch anywhere on the page. The
+   * chooser uses up the touch that opened it, so usually it is the next touch. A finger only counts as a user gesture
+   * when it lifts (pointerup), not when it lands (pointerdown), so the attempt runs then. If it fails, the next touch tries again.
+   */
+  const GESTURES = ["pointerup", "keydown"];
   function refullscreen(fs) {
     fs.documentElement.requestFullscreen().catch(() => {
-      const win = fs.defaultView ?? window;
+      const wins = [...new Set([fs.defaultView ?? window, window])];
+      const listen = (on) => wins.forEach((w) => GESTURES.forEach((t) => (on ? w.addEventListener : w.removeEventListener).call(w, t, again, true)));
       const again = () => {
-        win.removeEventListener("pointerdown", again, true);
-        window.removeEventListener("pointerdown", again, true);
-        if (!fs.fullscreenElement) fs.documentElement.requestFullscreen().catch(() => {});
+        if (fs.fullscreenElement) return listen(false);
+        fs.documentElement.requestFullscreen().then(() => listen(false), () => {});
       };
-      win.addEventListener("pointerdown", again, true);
-      window.addEventListener("pointerdown", again, true);
+      listen(true);
     });
   }
 
