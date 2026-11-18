@@ -717,6 +717,7 @@ export function mount(root, ctx) {
     }).join("");
     const list = rows || `<div class="gp-empty muted">No configurations yet. Shape the sound, then Save configuration… to put it on a quick slot of the phone or on a footswitch.</div>`;
     setHtml($(".gp-config-list"), list);
+    touchScroll($(".gp-config-list")); // (measures again: the list or the tab changed)
   }
 
   // ---- sheets ----------------------------------------------------------------------------------------------------
@@ -726,6 +727,7 @@ export function mount(root, ctx) {
     $(".gp-sheet").onclick = null;
     $(".gp-sheet").innerHTML = inner;
     wrap.hidden = false;
+    $(".gp-sheet").querySelectorAll(".gp-scroll").forEach(touchScroll); // lists in a window: the wide bar (D-306)
     wire($(".gp-sheet"));
   }
   function closeSheet() {
@@ -921,7 +923,7 @@ export function mount(root, ctx) {
     const name = stored.get(current)?.name?.trim() || lib.presetLabel(current);
     openSheet(
       `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(lib.presetLabel(current))} · ${esc(name)}${modifiedNow() ? " *" : ""}</div></div>
-      <div class="gp-cfg-mods">${modulesHtml(modules.map((m, s) => [s, m]))}</div>
+      <div class="gp-cfg-mods gp-scroll">${modulesHtml(modules.map((m, s) => [s, m]))}</div>
       <p class="gp-sheet-text muted">As the pedal plays it now${modifiedNow() ? ", with unsaved changes (*)" : ""}. Change modules in the signal chain above, or in the GE150 Pro Editor web app.</p>
       <div class="gp-sheet-btns"><button type="button" class="gp-btn primary gp-no">Close</button></div>`,
       (el) => (el.querySelector(".gp-no").onclick = closeSheet),
@@ -957,7 +959,7 @@ export function mount(root, ctx) {
     openSheet(
       `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(c.name)}</div></div>
       <p class="gp-sheet-text">${where}</p>
-      <div class="gp-cfg-mods">${mods || `<div class="muted">No module settings: it only selects the preset.</div>`}</div>
+      <div class="gp-cfg-mods gp-scroll">${mods || `<div class="muted">No module settings: it only selects the preset.</div>`}</div>
       <p class="gp-sheet-text muted">${Object.keys(c.modules).length < 9 ? "The other modules stay as they are. " : ""}Load sets these values on the pedal now, as unsaved changes; Save preset… keeps them.</p>
       <div class="gp-sheet-btns"><button type="button" class="gp-btn gp-no">Close</button>
         <button type="button" class="gp-btn primary gp-yes" ${canSwitch() ? "" : "disabled"}>Load</button></div>`,

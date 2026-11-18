@@ -139,6 +139,8 @@ def main():
             details = board.locator(".gp-sheet").inner_text()
             assert "DS" in details and "AMP" in details and "GAIN" in details, f"the stored modules and values: {details}"
             assert board.locator(".gp-sheet .gp-yes").inner_text() == "Load"
+            assert board.locator(".gp-sheet .gp-cfg-mods.touch-scroll").count() == 1, "the wide scrollbar's list in the window"
+            board.wait_for_timeout(300)
             shot(board, "board-config")
             board.locator(".gp-sheet .gp-no").click()
             assert board.locator(".gp-apply").first.inner_text() == "Load"
@@ -152,6 +154,8 @@ def main():
             info = board.locator(".gp-sheet").inner_text()
             assert "AMP" in info and "GAIN" in info and "CAB" in info, info
             assert board.locator(".gp-sheet button").count() == 1, "nothing to change there: only Close"
+            assert board.locator(".gp-sheet .gp-cfg-mods.touch-scroll").count() == 1, "the wide scrollbar's list in the window"
+            board.wait_for_timeout(300)
             shot(board, "board-preset-info")
             board.locator(".gp-sheet .gp-no").click()
             deck.locator(".gd-now").click()
