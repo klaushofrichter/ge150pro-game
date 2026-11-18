@@ -101,6 +101,18 @@ describe("GE150 Pro", () => {
     expect(rt.submit(0, { name: "confirm", payload: { from: "nobody", on: true } }, "human")).toEqual({ ok: false, reason: "Unknown question" });
   });
 
+  it("replaces every configuration with a file's, settling slots and footswitches, and refuses a file of nothing usable (E-023)", () => {
+    const { rt } = connected();
+    rt.submit(0, { name: "capture", payload: { config: config("old", { slot: 0 }) } }, "board");
+    const list = [config("a", { slot: 2, trigger: 5 }), config("b", { slot: 2 }), config("a"), { id: "bad id!" }];
+    expect(rt.submit(0, { name: "configs", payload: { list, replace: true } }, "board")).toEqual({ ok: true });
+    const configs = (rt.boardView() as any).configs;
+    expect(configs.map((c: any) => [c.id, c.slot, c.trigger])).toEqual([["a", null, 5], ["b", 2, null]]);
+    expect(rt.submit(0, { name: "configs", payload: { list: [{ id: "x" }], replace: true } }, "board")).toEqual({ ok: false, reason: "The file holds no configurations this game can use" });
+    expect(rt.submit(0, { name: "configs", payload: { list: [], replace: true } }, "board")).toEqual({ ok: true });
+    expect((rt.boardView() as any).configs).toEqual([]);
+  });
+
   it("wraps around the 200 presets", () => {
     const { rt } = connected();
     rt.submit(0, { name: "select", payload: { index: 200 } }, "human");

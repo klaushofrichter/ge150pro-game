@@ -30,7 +30,8 @@ play. The table only controls the pedal; the guitar plays through the pedal as a
   expression pedal's target),
   **Rhythm** (the pedal's drum machine by name and tempo, and a **table click** with tap tempo that can follow the
   drum machine) and **Pedal** (connection, configurations: rename, delete). The game is left through the platform's player tab. The table keeps the
-  configurations between games (its game data: *Advanced › Game data* on the board exports, imports and deletes them).
+  configurations between games (its game data: *Advanced › Game data* on the board exports, imports and deletes them; the Configurations tab also
+  saves all of them to one file and loads such a file back).
 - **Rhythm** on the pedal itself is started and stopped on the pedal: its firmware takes no rhythm commands over USB
   (nor MIDI start/stop or clock). The table click is the table's own, from its speakers.
 
