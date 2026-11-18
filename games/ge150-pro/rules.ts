@@ -30,7 +30,10 @@ export interface Config {
 }
 
 /** Something the board does on the pedal for the phone, numbered so the board does each once (E-003). */
-export type NewCommand = { kind: "select"; index: number } | { kind: "apply"; config: Config };
+export type NewCommand = { kind: "select"; index: number } | { kind: "apply"; config: Config } | { kind: "save" };
+
+/** Where a "save unsaved changes before switching?" question is open (E-021): the other screen may not switch meanwhile. */
+export type Confirming = "board" | "deck" | null;
 export type Command = NewCommand & { n: number };
 
 export interface PedalRhythm {
@@ -87,6 +90,8 @@ export interface State {
   click: Click;
   /** For the summary. */
   stats: { recalls: number; applied: number; switched: number; captured: number };
+  /** An open "save before switching?" question (E-021); missing in games saved before it. */
+  confirming?: Confirming;
 }
 
 const PRESETS = 200;
@@ -142,6 +147,17 @@ function settle(configs: Config[], newest: Config): Config[] {
       ? newest
       : { ...c, slot: newest.slot !== null && c.slot === newest.slot ? null : c.slot, trigger: newest.trigger !== null && c.trigger === newest.trigger ? null : c.trigger },
   );
+}
+
+const BOARD_ASKS = "The board is asking about unsaved changes";
+
+/**
+ * The phone's answer to its own question: the question closes, and with `save` the board first stores the current
+ * preset (a "save" command before the switch).
+ */
+function answered(state: State, p: Record<string, unknown>): State {
+  const s = state.confirming === "deck" ? { ...state, confirming: null } : state;
+  return p.save === true ? queue(s, { kind: "save" }) : s;
 }
 
 function queue(state: State, cmd: NewCommand): State {
@@ -217,6 +233,7 @@ function view(s: State) {
     /** The click's tempo now: the pedal drum machine's when following it, else its own. */
     tempo: s.click.follow && s.pedal.rhythm?.bpm ? s.pedal.rhythm.bpm : s.click.bpm,
     quickSlots: QUICK_SLOTS,
+    confirming: s.confirming ?? null,
   };
 }
 
@@ -230,7 +247,7 @@ function describeStep(step: StepInfo<State>): StepDescription | null {
   const after = step.after;
   switch (step.intent.name) {
     case "select":
-      return { text: `selects ${presetLabel(after.pedal.current)}` };
+      return { text: `${p.save === true ? "saves the preset and " : ""}selects ${presetLabel(after.pedal.current)}` };
     case "apply":
       return { text: `recalls ${after.configs.find((c) => c.id === p.id)?.name ?? "a configuration"}` };
     case "capture":
@@ -262,6 +279,7 @@ export default defineGame<State>({
       nextCommand: 1,
       click: { on: false, bpm: 100, follow: true, beats: 4, run: 0 },
       stats: { recalls: 0, applied: 0, switched: 0, captured: 0 },
+      confirming: null,
     };
   },
 
@@ -289,7 +307,8 @@ export default defineGame<State>({
         if (index === null) return { reject: "That is not a preset of the GE150 Pro" };
         const applied = typeof p.config === "string" && state.configs.some((c) => c.id === p.config);
         return {
-          state: { ...state, pedal: { ...state.pedal, current: index }, stats: { ...state.stats, switched: state.stats.switched + 1, applied: state.stats.applied + (applied ? 1 : 0) } },
+          // (a question about switching is moot: the pedal switched by itself)
+          state: { ...state, confirming: null, pedal: { ...state.pedal, current: index }, stats: { ...state.stats, switched: state.stats.switched + 1, applied: state.stats.applied + (applied ? 1 : 0) } },
           events: applied ? [{ name: "applied", data: { id: p.config, index } }] : [],
         };
       }
@@ -319,7 +338,8 @@ export default defineGame<State>({
         const c = state.configs.find((x) => x.id === p.id);
         if (!c) return { reject: "That configuration is gone" };
         if (!state.pedal.connected) return { reject: "The pedal is not connected" };
-        const next = queue(state, { kind: "apply", config: c });
+        if (state.confirming === "board") return { reject: BOARD_ASKS };
+        const next = queue(answered(state, p), { kind: "apply", config: c });
         return { state: { ...next, stats: { ...state.stats, recalls: state.stats.recalls + 1 } }, events: [{ name: "apply", data: { id: c.id } }] };
       }
       case "select": {
@@ -328,7 +348,19 @@ export default defineGame<State>({
         const step = int(p.step, -PRESETS, PRESETS);
         const target = index ?? (step !== null && state.pedal.current ? ((state.pedal.current - 1 + step + PRESETS * 2) % PRESETS) + 1 : null);
         if (target === null) return { reject: "That is not a preset of the GE150 Pro" };
-        return { state: queue({ ...state, pedal: { ...state.pedal, current: target } }, { kind: "select", index: target }) };
+        if (state.confirming === "board") return { reject: BOARD_ASKS };
+        return { state: queue({ ...answered(state, p), pedal: { ...state.pedal, current: target } }, { kind: "select", index: target }) };
+      }
+      case "confirm": {
+        // a screen opens or closes its "save before switching?" question; the other screen may not switch meanwhile
+        const from = p.from === "board" || p.from === "deck" ? p.from : null;
+        if (!from || typeof p.on !== "boolean") return { reject: "Unknown question" };
+        const now = state.confirming ?? null;
+        if (p.on) {
+          if (now && now !== from) return { reject: now === "board" ? BOARD_ASKS : "The phone is asking about unsaved changes" };
+          return now === from ? { state } : { state: { ...state, confirming: from } };
+        }
+        return now === from ? { state: { ...state, confirming: null } } : { state };
       }
       case "click": {
         const bpm = "bpm" in p ? int(p.bpm, 30, 300) : state.click.bpm;
@@ -388,7 +420,7 @@ export default defineGame<State>({
   onSeatChanged(state, seat) {
     // Another person: the last player's queued commands and counts end. The table's configurations are everyone's
     // who plays here (E-017); on a table without game data they are the player's own, and the phone brings theirs.
-    const fresh = { ...state, player: seat.name, commands: [], stats: { recalls: 0, applied: 0, switched: 0, captured: 0 } };
+    const fresh = { ...state, player: seat.name, commands: [], confirming: null, stats: { recalls: 0, applied: 0, switched: 0, captured: 0 } };
     return { state: state.shared ? fresh : { ...fresh, configs: [], synced: false } };
   },
 

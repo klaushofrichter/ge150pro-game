@@ -31,6 +31,9 @@ board says so and changes nothing on the pedal: update it with Mooer's editor.
   a fader, or use **−** and **+**.
 - **Presets** selects a preset by bank and A–D, like the footswitches. Changes are live on the pedal and are lost when
   it switches presets, as on the pedal itself. **Save…** stores the current sound in its preset slot (it asks first).
+  With **Confirm when changing presets after edits** on (the board's settings, off by default), switching with
+  unsaved changes asks first, on the board or the phone where you switched: **Save and switch**, **Discard and
+  switch** or **Cancel**. The other screen waits for the answer. The pedal's own footswitches never ask.
 - **Configurations** lists your saved configurations; **Apply** sets one now.
 
 ## Configurations and quick slots

@@ -93,11 +93,12 @@ describe("the UIs send only intents the rules know", () => {
   const read = (f: string) => readFileSync(`${ROOT}/games/ge150-pro/${f}`, "utf8");
   const sentBy = (src: string, fn: RegExp) => [...new Set([...src.matchAll(fn)].map((m) => m[1]))].sort();
   const board = sentBy(read("board.js"), /ctx\.act\(\s*[^,]+,\s*"([a-z-]+)"/g);
-  const deck = sentBy(read("deck.js"), /(?:ctx\.send|\bsend)\(\s*"([a-z-]+)"/g);
+  // (a switch asked for on the phone goes through switchFromPhone(target, "intent", payload), E-021)
+  const deck = sentBy(read("deck.js"), /(?:ctx\.send|\bsend|switchFromPhone)\(\s*(?:[^,()]+(?:\([^()]*\))?,\s*)?"([a-z-]+)"/g);
 
   it("finds the intents in the source (the scan works)", () => {
-    expect(board).toEqual(expect.arrayContaining(["pedal", "done", "capture", "switched", "edit"]));
-    expect(deck).toEqual(expect.arrayContaining(["select", "apply", "click", "configs", "edit"]));
+    expect(board).toEqual(expect.arrayContaining(["pedal", "done", "capture", "switched", "edit", "confirm"]));
+    expect(deck).toEqual(expect.arrayContaining(["select", "apply", "click", "configs", "edit", "confirm"]));
   });
 
   it("the board sends only intents its manifest lists in boardIntents", () => {

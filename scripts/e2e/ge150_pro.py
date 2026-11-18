@@ -164,6 +164,57 @@ def main():
             assert status.startswith("Connected"), f"the phone still sees a connected pedal: {status}"
             deck.locator(".gd-tab[data-tab=play]").click()
 
+            # E-021: with "Confirm when changing presets after edits" on, a switch with unsaved changes asks first, on
+            # the screen it was asked for; the other screen cannot switch meanwhile.
+            a("POST", "/game/prefs", {"prefs": {"confirm": True}})
+            board.locator(".gp-tab[data-tab=presets]").click()
+            board.locator(".gp-power[data-power='3']").click()  # an edit: the current preset has unsaved changes
+            wait(lambda: deck.locator(".gd-name").inner_text().endswith("*"), 5, "the phone to see unsaved changes")
+            start_at = board.evaluate("() => window.__pedal.state.current")
+            stores = sent(board, 0xc3)
+            deck.locator(".gd-next").click()
+            wait(lambda: deck.locator(".gd-ask-wrap").is_visible(), 5, "the phone to ask first")
+            wait(lambda: board.locator(".gp-preset").first.is_disabled(), 5, "the board's presets to wait for the phone")
+            assert "phone is asking" in board.locator(".gp-presets-hint").inner_text()
+            assert board.evaluate("() => window.__pedal.state.current") == start_at, "nothing switched while asking"
+            check(deck, "phone question")
+            shot(deck, "phone-confirm")
+            deck.locator(".gd-ask-save").click()
+            wait(lambda: board.evaluate("() => window.__pedal.state.current") == start_at + 1, 5, "the pedal to switch after saving")
+            assert sent(board, 0xc3) == stores + 1, "Save and switch stores the preset once"
+            order = board.evaluate("() => window.__pedal.log.map((m) => m.cmd).filter((c) => c === 0xc3 || c === 0x96).slice(-2)")
+            assert order == [0xC3, 0x96], f"saved before switching: {order}"
+            wait(lambda: board.locator(".gp-preset").first.is_enabled(), 5, "the board's presets back after the answer")
+            # the next edit only once the pedal has loaded the new preset: an edit during the load is overwritten by
+            # it, on the hardware too (and then there is nothing unsaved to ask about)
+            wait(lambda: f"Preset {start_at + 1}" in board.locator(".gp-name").inner_text(), 5, "the board on the new preset")
+            time.sleep(0.8)
+
+            board.locator(".gp-power[data-power='3']").click()  # unsaved changes again, now asked on the board
+            wait(lambda: board.locator(".gp-name").inner_text().endswith("*"), 5, "the board to mark unsaved changes")
+            target = start_at + 2 if (start_at + 2) % 4 != 1 else start_at  # a preset of the shown bank
+            board.locator(f".gp-preset[data-index='{target}']").click()
+            board.wait_for_selector(".gp-sheet .gp-discard")
+            wait(lambda: deck.locator(".gd-next").is_disabled(), 5, "the phone's arrows to wait for the board")
+            assert deck.locator(".gd-board-asks").is_visible()
+            shot(board, "board-confirm")
+            board.locator(".gp-sheet .gp-no").click()
+            wait(lambda: deck.locator(".gd-next").is_enabled(), 5, "the phone free again after Cancel")
+            assert board.evaluate("() => window.__pedal.state.current") == start_at + 1, "Cancel keeps the preset"
+            assert board.locator(".gp-name").inner_text().endswith("*"), "Cancel keeps the unsaved changes"
+            preset = board.locator(f".gp-preset[data-index='{target}']")
+            wait(lambda: preset.is_enabled(), 5, "the board's presets after Cancel")
+            preset.click()
+            try:
+                wait(lambda: board.locator(".gp-sheet .gp-discard").is_visible(), 5, "the board to ask again")
+            except AssertionError:
+                raise AssertionError(f"the board did not ask again: pedal on {board.evaluate('() => window.__pedal.state.current')}, "
+                                     f"name {board.locator('.gp-name').inner_text()!r}, view {board.evaluate('() => document.querySelector(\'.gp-presets-hint\').textContent')!r}")
+            board.locator(".gp-sheet .gp-discard").click()
+            wait(lambda: board.evaluate("() => window.__pedal.state.current") == target, 5, "Discard and switch to switch")
+            assert sent(board, 0xc3) == stores + 1, "Discard and switch stores nothing"
+            a("POST", "/game/prefs", {"prefs": {"confirm": False}})
+
             # Rhythm: the pedal's drum machine by name, and the table's click.
             deck.locator(".gd-tab[data-tab=rhythm]").click()
             wait(lambda: "8 BEAT 4" in deck.locator(".gd-pr-style").inner_text(), 5, "the drum machine's style on the phone")
