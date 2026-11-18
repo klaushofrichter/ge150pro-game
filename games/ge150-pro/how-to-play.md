@@ -33,6 +33,7 @@ board says so and changes nothing on the pedal: update it with Mooer's editor.
   its name to edit it below.
 - **The editor** shows the module's model (tap it to choose another) and a fader for each parameter: drag anywhere on
   a fader, or use **−** and **+**.
+- Tap the **bank name** on the right to see every bank and its presets; tap one to show that bank.
 - **EXP** under a fader makes the expression pedal control that value in EXP mode (the toe switch selects EXP or
   volume mode). One value per preset: choosing another moves it there, and the chain shows an **EXP** badge on the
   module that has it. Faders without EXP are values the pedal cannot control. **Save preset…** keeps the choice.

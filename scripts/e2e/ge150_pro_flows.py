@@ -80,10 +80,28 @@ def main():
             # The model window: another model for the open module (AMP) on the pedal.
             board.locator(".gp-model").click()
             board.wait_for_selector(".gp-model-card")
+            wait(lambda: board.locator(".gp-models.touch-scroll.scrolls .scroll-bar").count() == 1, 5, "the wide scrollbar in the model window")
+            assert board.evaluate("() => getComputedStyle(document.querySelector('.gp-models')).scrollbarWidth") == "none", "no thin bar beside it"
+            shot(board, "board-models")
             board.locator(".gp-model-card[data-type='7']").click()
             wait(lambda: board.evaluate("() => window.__pedal.state.live[2].type") == 7, 5, "the pedal to get the new AMP model")
             assert board.locator(".gp-sheet-wrap").is_hidden(), "the model window closes after a choice"
             shot(board, "board-model")
+
+            # E-029: the bank name opens every bank; a preset there shows its bank and selects nothing on the pedal.
+            playing = board.evaluate("() => window.__pedal.state.current")
+            selects = sent(board, 0x96)
+            board.locator(".gp-bank-name").click()
+            board.wait_for_selector(".gp-bk-row")
+            assert board.locator(".gp-bk-row").count() == 50, board.locator(".gp-bk-row").count()
+            assert board.locator(".gp-bk-row.sel").is_visible(), "the shown bank is in view"
+            wait(lambda: board.locator(".gp-banks.touch-scroll.scrolls .scroll-bar").count() == 1, 5, "the wide scrollbar in the banks")
+            shot(board, "board-banks")
+            board.locator(".gp-bk-row").nth(13).locator(".gp-bk-preset").nth(2).click()
+            assert board.locator(".gp-sheet-wrap").is_hidden(), "the banks close after a choice"
+            assert board.locator(".gp-bank-name").inner_text() == "Bank 14", board.locator(".gp-bank-name").inner_text()
+            time.sleep(0.3)
+            assert sent(board, 0x96) == selects and board.evaluate("() => window.__pedal.state.current") == playing, "only shown, not selected"
 
             # A configuration for the next game, on quick slot 1.
             board.locator(".gp-tab[data-tab=configs]").click()

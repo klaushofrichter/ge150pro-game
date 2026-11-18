@@ -1,7 +1,10 @@
 // GE150 Pro on the board: the pedal's signal chain and its parameters by touch, the presets, and the configurations
 // the phone recalls. The pedal is driven over WebHID by the table's own board only, for the player sitting at it
 // (E-002); a remote board shows the state and a note. The protocol library is assets/ge150.js (src/ge150/).
-import { audio as sharedAudio, esc, html, seatPlates, useStyles } from "/shared/board-kit.js";
+import * as kit from "/shared/board-kit.js";
+const { audio: sharedAudio, esc, html, seatPlates, useStyles } = kit;
+/** The platform's wide scrollbar for a finger (D-306), where the table has it; else the browser's own. */
+const touchScroll = (el) => kit.touchScroll?.(el);
 
 const ID = "ge150-pro";
 const REPORT_MS = 150; // reports to the rules are merged for this long (each counts as a move)
@@ -88,7 +91,7 @@ export function mount(root, ctx) {
           <button class="gp-tab" type="button" data-tab="configs">Configurations</button></div>
         <div class="gp-pane gp-presets">
           <div class="gp-bank"><button class="gp-btn gp-bank-prev" type="button" aria-label="Previous bank">◀</button>
-            <div class="gp-bank-name"></div><button class="gp-btn gp-bank-next" type="button" aria-label="Next bank">▶</button></div>
+            <button class="gp-bank-name" type="button" aria-label="All banks"></button><button class="gp-btn gp-bank-next" type="button" aria-label="Next bank">▶</button></div>
           <div class="gp-abcd"></div>
           <div class="gp-hint muted gp-presets-hint"></div>
         </div>
@@ -768,15 +771,55 @@ export function mount(root, ctx) {
     openSheet(
       `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(lib.catalog.slots[selected].name)}: choose a model</div>
         <button type="button" class="gp-btn gp-close">Close</button></div>
-      <div class="gp-models">${models.map((m) => `<button type="button" class="gp-model-card ${m.index === modules[selected].type ? "on" : ""}" data-type="${m.index}">
+      <div class="gp-models gp-scroll">${models.map((m) => `<button type="button" class="gp-model-card ${m.index === modules[selected].type ? "on" : ""}" data-type="${m.index}">
         <span>${String(m.index + 1).padStart(2, "0")}</span><b>${esc(m.name)}</b></button>`).join("")}</div>`,
       (el) => {
         el.querySelector(".gp-close").onclick = closeSheet;
+        scrollTo(el.querySelector(".gp-models"), el.querySelector(".gp-model-card.on"));
         el.querySelector(".gp-models").onclick = (e) => {
           const b = e.target.closest(".gp-model-card");
           if (!b) return;
           setModel(selected, Number(b.dataset.type));
           closeSheet();
+        };
+      },
+    );
+  }
+
+  /** A sheet's list that scrolls: the wide bar for a finger, with the chosen entry in view. */
+  function scrollTo(list, chosen) {
+    touchScroll(list);
+    if (chosen) list.scrollTop = chosen.offsetTop - list.offsetTop - (list.clientHeight - chosen.offsetHeight) / 2;
+    touchScroll(list); // (measures again after the scroll)
+  }
+
+  /** Every bank with its four presets; tapping one shows that bank on the right (E-029). Selects nothing on the pedal. */
+  function openBanks() {
+    if (!lib) return;
+    const local = plays();
+    const names = local && ready ? null : view.pedal.names;
+    const nameOf = (i) => (names ? names[i - 1] : stored.get(i)?.name.trim()) || "";
+    const playing = local ? current || view.pedal.current : view.pedal.current;
+    const rows = Array.from({ length: banks() }, (_, b) => {
+      const cells = [0, 1, 2, 3].map((k) => {
+        const i = b * 4 + k + 1;
+        return `<button type="button" class="gp-bk-preset ${i === playing ? "on" : ""}" data-bank="${b + 1}"><b>${"ABCD"[k]}</b><span>${esc(nameOf(i) || "—")}</span></button>`;
+      }).join("");
+      return `<div class="gp-bk-row ${b + 1 === bank ? "sel" : ""}"><button type="button" class="gp-bk-num" data-bank="${b + 1}">${b + 1}</button>${cells}</div>`;
+    }).join("");
+    openSheet(
+      `<div class="gp-sheet-head"><div class="gp-sheet-title">Banks</div>
+        <button type="button" class="gp-btn gp-close">Close</button></div>
+      <div class="gp-banks gp-scroll">${rows}</div>`,
+      (el) => {
+        el.querySelector(".gp-close").onclick = closeSheet;
+        scrollTo(el.querySelector(".gp-banks"), el.querySelector(".gp-bk-row.sel"));
+        el.querySelector(".gp-banks").onclick = (e) => {
+          const b = e.target.closest("[data-bank]");
+          if (!b) return;
+          bank = Number(b.dataset.bank);
+          closeSheet();
+          draw();
         };
       },
     );
@@ -1021,6 +1064,7 @@ export function mount(root, ctx) {
   const banks = () => lib.PRESET_COUNT / 4;
   $(".gp-bank-prev").addEventListener("click", () => ((bank = bank === 1 ? banks() : bank - 1), draw()));
   $(".gp-bank-next").addEventListener("click", () => ((bank = bank === banks() ? 1 : bank + 1), draw()));
+  $(".gp-bank-name").addEventListener("click", openBanks);
   $(".gp-abcd").addEventListener("click", (e) => {
     const b = e.target.closest(".gp-preset");
     if (b) switchFromBoard(Number(b.dataset.index), () => select(Number(b.dataset.index)));
