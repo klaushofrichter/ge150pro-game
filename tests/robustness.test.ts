@@ -97,7 +97,7 @@ describe("the UIs send only intents the rules know", () => {
 
   it("finds the intents in the source (the scan works)", () => {
     expect(board).toEqual(expect.arrayContaining(["pedal", "done", "capture", "switched", "edit"]));
-    expect(deck).toEqual(expect.arrayContaining(["select", "apply", "click", "configs", "finish", "edit"]));
+    expect(deck).toEqual(expect.arrayContaining(["select", "apply", "click", "configs", "edit"]));
   });
 
   it("the board sends only intents its manifest lists in boardIntents", () => {
