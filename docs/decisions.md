@@ -189,3 +189,13 @@ Records are history: an older record is not edited when a newer one changes it. 
   parameters the pedal accepts. Fixed on the way: the board did not redraw on the pedal's EXP reports, and a target
   chosen while the board was still reading a just-selected preset was shown as the old one; the board now shows it
   again once the pedal has it. Configurations do not keep the EXP target.
+- **E-028 · 2026-11-18 · Klaus** — The board shows the expression pedal's mode: in volume mode the chosen **EXP**
+  under a fader and the chain's **EXP** badge are outlined in brass (thick border, no fill); in EXP mode they are
+  filled as before. Tapping another fader's EXP moves the target and keeps the mode; tapping the chosen EXP again
+  switches the mode, EXP ⇄ volume, as the toe switch does (the preset's own start mode is unchanged). Into EXP mode
+  the board reads the live values so the slider shows what the pedal set, if the pedal sets it at once. The Requires
+  card (wider now) asks to calibrate the pedal (EXP → CALIBRATE on the pedal) for its full range, and the
+  Disconnected text names the web editor's address. *Implementation (Claude):* the mode is `FUN_SWITCH` in `98`,
+  which the pedal reports in `18` when its toe switch changes; the live read (`B0`) does not take the stored preset
+  again, so unsaved edits stay. Not tried on the pedal: whether the value jumps to the pedal's position on the switch,
+  and volume mode in a preset whose EXP VOL is off.

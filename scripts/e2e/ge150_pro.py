@@ -287,7 +287,23 @@ def main():
             assert board.evaluate("() => window.__pedal.state.exp.slice(0, 2)") == [2, 13], "AMP GAIN (13) is the target"
             wait(lambda: board.locator(".gp-tile[data-slot='2'] .gp-exp-badge").count() == 1, 5, "the badge on AMP")
             assert board.locator(".gp-exp-badge").count() == 1, "one target only"
-            assert gain.get_attribute("aria-pressed") == "true" and gain.is_disabled(), "the active one stays until another is chosen"
+            assert gain.get_attribute("aria-pressed") == "true" and not gain.is_disabled(), "the active one stays until another is chosen"
+            mode = board.evaluate("() => window.__pedal.state.exp[2]")
+            assert mode == 1, f"a new target keeps the mode the pedal is in (EXP): {mode}"
+            assert "vol" not in (gain.get_attribute("class") or ""), "EXP mode: the target is filled"
+            # E-028: the active EXP again switches the mode, as the toe switch does; volume mode only outlines it
+            gain.click()
+            wait(lambda: board.evaluate("() => window.__pedal.state.exp[2]") == 0, 5, "volume mode on the pedal")
+            wait(lambda: "vol" in (gain.get_attribute("class") or ""), 5, "the outlined EXP in volume mode")
+            assert "vol" in board.locator(".gp-tile[data-slot='2'] .gp-exp-badge").get_attribute("class"), "the badge outlined too"
+            assert board.locator(".gp-exp-note").is_visible(), "the volume-mode note"
+            shot(board, "board-exp-volume")
+            reads = sent(board, 0xb0)
+            gain.click()
+            wait(lambda: board.evaluate("() => window.__pedal.state.exp[2]") == 1, 5, "EXP mode on the pedal again")
+            wait(lambda: sent(board, 0xb0) > reads, 5, "a read of the live values for the pedal's position")
+            wait(lambda: "vol" not in (gain.get_attribute("class") or ""), 5, "filled again in EXP mode")
+            assert board.locator(".gp-name").inner_text().endswith("*"), "the read keeps the unsaved target"
             wait(lambda: board.locator(".gp-name").inner_text().endswith("*"), 5, "a new target is an unsaved change")
             shot(board, "board-exp")
             target_now = board.evaluate("() => window.__pedal.state.current")
