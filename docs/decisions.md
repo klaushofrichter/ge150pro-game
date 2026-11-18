@@ -176,7 +176,10 @@ Records are history: an older record is not edited when a newer one changes it. 
 - **E-026 · 2026-11-17 · Klaus** — Connect pedal in fullscreen: Chrome's device chooser ends fullscreen; once a pedal
   is chosen (or the chooser is closed) the board asks for fullscreen again, on the same page the table's Fullscreen
   uses. If the browser no longer allows it without a touch, the next touch anywhere brings it back. Not covered by
-  the browser checks (their pedal has no chooser); to be tried on the table.
+  the browser checks (their pedal has no chooser); to be tried on the table. *Fix (2026-11-18):* on the table it
+  stayed out of fullscreen. The chooser uses up the touch, and the board waited for the next finger to land
+  (pointerdown), which a browser does not count as a gesture for a touch; it now asks when the finger lifts
+  (pointerup) or a key is pressed, and keeps trying on each touch until fullscreen is back.
 - **E-027 · 2026-11-17 · Klaus** — Each fader the expression pedal can control gets an **EXP** toggle: tapping it makes
   that value the preset's EXP target (one per preset, moved there without asking; the active toggle cannot be turned
   off, since the pedal always has a target). The chain shows an **EXP** badge on the module that has it; a note says
