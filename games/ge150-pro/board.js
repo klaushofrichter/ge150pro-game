@@ -27,7 +27,7 @@ const STATES = {
     text: `The game needs firmware ${MIN_FIRMWARE} or newer. Update the pedal with Mooer's editor; the game changes nothing on this pedal.` },
   error: { title: "Pedal error", text: "" },
 };
-const prefsOf = (info) => ({ volume: VOLUMES.includes(info?.prefs?.volume) ? info.prefs.volume : 60 });
+const prefsOf = (info) => ({ volume: VOLUMES.includes(info?.prefs?.volume) ? info.prefs.volume : 60, confirm: info?.prefs?.confirm === true });
 
 /** The mounted board, for the settings window. */
 let live = null;
@@ -42,6 +42,13 @@ export function settings({ info, setPrefs }) {
       value: String(p.volume),
       options: VOLUMES.map((v) => ({ value: String(v), label: v ? `${v}%` : "Off" })),
       onChange: (v) => setPrefs({ volume: Number(v) }),
+    },
+    {
+      type: "toggle",
+      label: "Confirm when changing presets after edits",
+      hint: "Before the board or the phone selects another preset, offer to save unsaved changes. The pedal's own footswitches switch without asking.",
+      value: p.confirm,
+      onChange: (v) => setPrefs({ confirm: v === true }),
     },
     { type: "button", label: "Pedal", action: "Connect the pedal again", onChange: () => live?.reconnect() },
     { type: "text", label: "Requires", value: `Mooer GE150 Pro by USB, firmware ${MIN_FIRMWARE} or newer` },
@@ -78,7 +85,7 @@ export function mount(root, ctx) {
           <div class="gp-bank"><button class="gp-btn gp-bank-prev" type="button" aria-label="Previous bank">◀</button>
             <div class="gp-bank-name"></div><button class="gp-btn gp-bank-next" type="button" aria-label="Next bank">▶</button></div>
           <div class="gp-abcd"></div>
-          <div class="gp-hint muted">Tap a preset to select it on the pedal. Unsaved changes on the pedal are lost when it switches.</div>
+          <div class="gp-hint muted gp-presets-hint"></div>
         </div>
         <div class="gp-pane gp-configs" hidden>
           <button class="gp-btn primary gp-capture" type="button">Save configuration…</button>
@@ -107,6 +114,8 @@ export function mount(root, ctx) {
   let lastDone = 0, lastAcked = 0; // the last command carried out by this board, and the last one reported done
   let busy = Promise.resolve();
   let pending = {}, reportTimer = null;
+  /** This board's "save before switching?" sheet is open (E-021); a store waiting for the pedal's acknowledgement. */
+  let asking = false, storedWait = null;
   const sendTimers = new Map(), sendNext = new Map(), editedAt = new Map();
 
   const playerSeat = () => (view ? view.seat : null);
@@ -298,6 +307,7 @@ export function mount(root, ctx) {
       rhythm = r;
       report({ rhythm: r });
     });
+    d.on("stored", (i) => storedWait?.(i));
     d.on("stored", (i) => {
       if (i === current && modules) {
         const keep = kept();
@@ -353,6 +363,7 @@ export function mount(root, ctx) {
    * only for its own selections, never for ours, so no selection of ours needs filtering out. */
   function onSwitched(index) {
     if (!ready) return;
+    if (asking) closeSheet(); // the pedal switched by itself: the question is moot
     // one queue for all pedal work, so a configuration never interleaves with a phone command
     later(async () => {
       const c = view?.configs.find((x) => x.trigger === index);
@@ -375,7 +386,7 @@ export function mount(root, ctx) {
     for (const c of view.commands) {
       if (c.n <= lastDone) continue;
       lastDone = c.n;
-      later(() => (c.kind === "select" ? select(c.index) : applyConfig(c.config, false)));
+      later(() => (c.kind === "select" ? select(c.index) : c.kind === "save" ? storeCurrent() : applyConfig(c.config, false)));
     }
     later(() => {
       if (lastDone === lastAcked) return;
@@ -461,6 +472,9 @@ export function mount(root, ctx) {
   }
 
   const canEdit = () => plays() && !!dev && ready && !!modules && !view?.done;
+  /** The phone has a "save before switching?" question open (E-021): the board does not switch meanwhile. */
+  const phoneAsks = () => view?.confirming === "deck";
+  const canSwitch = () => canEdit() && !phoneAsks();
 
   // ---- drawing ---------------------------------------------------------------------------------------------------
   function draw() {
@@ -562,10 +576,15 @@ export function mount(root, ctx) {
     $(".gp-bank-name").textContent = `Bank ${bank}`;
     const btns = [0, 1, 2, 3].map((k) => {
       const i = (bank - 1) * 4 + k + 1;
-      return `<button type="button" class="gp-preset ${i === idx ? "on" : ""}" data-index="${i}" ${canEdit() ? "" : "disabled"}>
+      return `<button type="button" class="gp-preset ${i === idx ? "on" : ""}" data-index="${i}" ${canSwitch() ? "" : "disabled"}>
         <b>${"ABCD"[k]}</b><span>${esc(nameOf(i) || "")}</span></button>`;
     }).join("");
     setHtml($(".gp-abcd"), btns);
+    $(".gp-presets-hint").textContent = phoneAsks()
+      ? "The phone is asking whether to save the changes first: answer there."
+      : prefsOf(info).confirm
+        ? "Tap a preset to select it on the pedal. With unsaved changes, the board offers to save them first."
+        : "Tap a preset to select it on the pedal. Unsaved changes on the pedal are lost when it switches.";
     $(".gp-presets").hidden = tab !== "presets";
     $(".gp-configs").hidden = tab !== "configs";
     box.querySelectorAll(".gp-tab").forEach((t) => t.classList.toggle("on", t.dataset.tab === tab));
@@ -578,7 +597,7 @@ export function mount(root, ctx) {
       const tags = c.tags ?? [];
       return `<div class="gp-config"><div class="gp-config-text"><b>${esc(c.name)}</b><span class="muted">${esc(what || "preset only")}</span>
           <span class="gp-tags">${tags.map((t) => `<i>${esc(t)}</i>`).join("")}</span></div>
-        <button type="button" class="gp-btn gp-apply" data-id="${esc(c.id)}" ${canEdit() ? "" : "disabled"}>Apply</button>
+        <button type="button" class="gp-btn gp-apply" data-id="${esc(c.id)}" ${canSwitch() ? "" : "disabled"}>Apply</button>
         <button type="button" class="gp-btn gp-delete" data-id="${esc(c.id)}" aria-label="Delete ${esc(c.name)}" ${plays() && !view.done ? "" : "disabled"}>✕</button></div>`;
     }).join("");
     const list = rows || `<div class="gp-empty muted">No configurations yet. Shape the sound, then Save configuration… to put it on a quick slot of the phone or on a footswitch.</div>`;
@@ -592,7 +611,42 @@ export function mount(root, ctx) {
     wrap.hidden = false;
     wire($(".gp-sheet"));
   }
-  const closeSheet = () => ($(".gp-sheet-wrap").hidden = true);
+  function closeSheet() {
+    $(".gp-sheet-wrap").hidden = true;
+    if (!asking) return;
+    asking = false;
+    if (plays()) ctx.act(playerSeat(), "confirm", { from: "board", on: false });
+  }
+
+  /**
+   * A switch to another preset asked for on the board (`go` carries it out). With the setting on and unsaved changes,
+   * the board asks first whether to save them; the phone cannot switch while it asks (E-021).
+   */
+  function switchFromBoard(target, go) {
+    if (!canSwitch()) return;
+    if (!prefsOf(info).confirm || !modifiedNow()) return later(go);
+    const from = lib.presetLabel(current), to = target ? lib.presetLabel(target) : from;
+    const name = stored.get(current)?.name?.trim() || from;
+    asking = true;
+    ctx.act(playerSeat(), "confirm", { from: "board", on: true });
+    openSheet(
+      `<div class="gp-sheet-head"><div class="gp-sheet-title">Save the changes to ${esc(from)}?</div></div>
+      <p class="gp-sheet-text">"${esc(name)}" has unsaved changes. ${to === from ? `Selecting ${esc(to)} again reloads it and` : `Switching to ${esc(to)}`} discards them, unless you save them to ${esc(from)} first.</p>
+      <div class="gp-sheet-btns"><button type="button" class="gp-btn gp-no">Cancel</button><button type="button" class="gp-btn gp-discard">Discard and switch</button>
+        <button type="button" class="gp-btn primary gp-yes">Save and switch</button></div>`,
+      (el) => {
+        el.querySelector(".gp-no").onclick = closeSheet;
+        el.querySelector(".gp-discard").onclick = () => (closeSheet(), later(go));
+        el.querySelector(".gp-yes").onclick = () => {
+          closeSheet();
+          later(async () => {
+            await storeCurrent();
+            await go();
+          });
+        };
+      },
+    );
+  }
 
   function openModels() {
     if (!canEdit()) return;
@@ -624,15 +678,26 @@ export function mount(root, ctx) {
       <div class="gp-sheet-btns"><button type="button" class="gp-btn gp-no">Cancel</button><button type="button" class="gp-btn primary gp-yes">Save to ${esc(label)}</button></div>`,
       (el) => {
         el.querySelector(".gp-no").onclick = closeSheet;
-        el.querySelector(".gp-yes").onclick = async () => {
+        el.querySelector(".gp-yes").onclick = () => {
           closeSheet();
-          const p = stored.get(current);
-          if (!p || !dev) return;
-          // the toe switch's mode is playing too: the preset keeps its own FUN_SWITCH
-          await dev.storePreset({ ...p, modules: structuredClone(kept()), exp: { ...p.exp, ...(exp ?? {}), FUN_SWITCH: p.exp.FUN_SWITCH } }).catch(() => {});
+          later(storeCurrent);
         };
       },
     );
+  }
+
+  /** Store the sound the pedal plays now into the current preset's slot, and wait for the pedal to acknowledge it. */
+  async function storeCurrent() {
+    const p = stored.get(current);
+    if (!p || !dev) return;
+    const acked = new Promise((resolve) => {
+      const timer = setTimeout(resolve, 3000);
+      storedWait = (i) => i === p.index && (clearTimeout(timer), resolve());
+    });
+    // the toe switch's mode is playing too: the preset keeps its own FUN_SWITCH
+    await dev.storePreset({ ...p, modules: structuredClone(kept()), exp: { ...p.exp, ...(exp ?? {}), FUN_SWITCH: p.exp.FUN_SWITCH } }).catch(() => {});
+    await acked;
+    storedWait = null;
   }
 
   function openCapture() {
@@ -706,7 +771,7 @@ export function mount(root, ctx) {
   $(".gp-bank-next").addEventListener("click", () => ((bank = bank === banks() ? 1 : bank + 1), draw()));
   $(".gp-abcd").addEventListener("click", (e) => {
     const b = e.target.closest(".gp-preset");
-    if (b && canEdit()) later(() => select(Number(b.dataset.index)));
+    if (b) switchFromBoard(Number(b.dataset.index), () => select(Number(b.dataset.index)));
   });
   box.addEventListener("click", (e) => {
     const pw = e.target.closest("[data-power]");
@@ -719,9 +784,10 @@ export function mount(root, ctx) {
   });
   $(".gp-config-list").addEventListener("click", (e) => {
     const a = e.target.closest(".gp-apply");
-    if (a && canEdit()) {
+    if (a) {
       const c = view.configs.find((x) => x.id === a.dataset.id);
-      if (c) later(() => applyConfig(c, false));
+      // a configuration on another preset switches to it first
+      if (c) c.preset && c.preset !== current ? switchFromBoard(c.preset, () => applyConfig(c, false)) : canSwitch() && later(() => applyConfig(c, false));
       return;
     }
     const d = e.target.closest(".gp-delete");
@@ -836,6 +902,8 @@ export function mount(root, ctx) {
         // commands still in the view were not acknowledged yet: carry them out (each once)
         if (lastDone === 0 && v.commands.length) lastDone = v.commands[0].n - 1;
         runCommands();
+        // a question this board had open before it was reloaded is gone
+        if (local && v.confirming === "board" && !asking) ctx.act(playerSeat(), "confirm", { from: "board", on: false });
         syncClick();
         draw();
       });

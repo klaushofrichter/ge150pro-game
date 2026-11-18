@@ -141,3 +141,14 @@ Records are history: an older record is not edited when a newer one changes it. 
   without scrolling). **Play** is renamed **Preset**, which is what it selects. **Finish** leaves the Pedal tab: the
   game is left through the platform's player tab (the rules still accept `finish`). With no quick slot filled, the
   Preset tab says what the eight slots are for (Save configuration… on the board).
+- **E-021 · 2026-11-17 · Klaus** — A game setting, **Confirm when changing presets after edits** (off by default, as
+  before): switching to another preset with unsaved changes then asks first, on the screen where the switch was asked
+  for (board or phone): Save and switch, Discard and switch, Cancel. It asks only when the sound differs from the
+  preset as stored (the board's modified mark). While one screen asks, the other cannot switch presets or apply a
+  configuration on another preset. *Implementation (Claude):* a board pref (`info.prefs.confirm`, reaching the phone
+  too); the rules keep which screen asks (`confirming`, intent `confirm` from the board or the phone) and refuse the
+  phone's `select`/`apply` while the board asks; the phone's answer is its `select`/`apply`, with `save: true` queuing
+  a `save` command first, so the board stores and waits for the pedal's acknowledgement before it switches. A
+  footswitch switch on the pedal closes the question (moot); a screen reloaded with its question open clears it. The
+  pedal's footswitches cannot be held, so they never ask. Checks: rules test for the lock, browser check (both
+  screens: save then switch in that order, cancel, discard).

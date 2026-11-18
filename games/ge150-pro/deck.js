@@ -59,6 +59,7 @@ export function mount(root, ctx) {
         <div class="gd-slots"></div>
         <div class="gd-note muted gd-slots-note" hidden>Quick slots: on the board, Save configuration… puts a sound on a slot. Tap a slot while you play to recall it.</div>
         <div class="gd-exp muted"></div>
+        <div class="gd-note muted gd-board-asks" hidden>The board is asking whether to save the changes first: answer there.</div>
       </section>
       <section class="gd-page gd-rhythm" data-page="rhythm" hidden>
         <div class="card gd-pedal-rhythm"><div class="eyebrow">Pedal drum machine</div>
@@ -79,9 +80,15 @@ export function mount(root, ctx) {
         <div class="gd-list"></div>
       </section>
     </div>
+    <div class="gd-ask-wrap" hidden><div class="card gd-ask" role="alertdialog" aria-labelledby="gd-ask-title">
+      <div class="gd-ask-title" id="gd-ask-title"></div><div class="gd-ask-text muted"></div>
+      <div class="gd-ask-btns"><button type="button" class="primary gd-ask-save">Save and switch</button>
+        <button type="button" class="gd-ask-discard">Discard and switch</button><button type="button" class="gd-ask-cancel">Cancel</button></div></div></div>
   </div>`;
   const $ = (s) => root.querySelector(s);
-  let view = null, lib = null, sent = false, taps = [], beatTimer = null, beatKey = "";
+  let view = null, info = null, lib = null, sent = false, taps = [], beatTimer = null, beatKey = "";
+  /** The open "save before switching?" question (E-021): what to send once answered, and the preset it was about. */
+  let ask = null;
 
   import(ctx.assetUrl("ge150.js")).then((m) => {
     lib = m;
@@ -110,10 +117,12 @@ export function mount(root, ctx) {
     $(".gd-label").textContent = p.current ? `Preset ${label(p.current)}` : "GE150 Pro";
     $(".gd-name").textContent = p.current ? `${p.names[p.current - 1] || "—"}${p.modified ? " *" : ""}` : "Waiting for the pedal";
     $(".gd-conn").textContent = view.done ? "Done" : p.connected ? "" : p.text || "Connect the pedal on the board";
-    $(".gd-prev").disabled = $(".gd-next").disabled = !live;
+    const boardAsks = view.confirming === "board";
+    $(".gd-prev").disabled = $(".gd-next").disabled = !live || boardAsks;
+    $(".gd-board-asks").hidden = !boardAsks;
     const slots = Array.from({ length: view.quickSlots }, (_, q) => {
       const c = view.configs.find((x) => x.slot === q);
-      return `<button type="button" class="gd-slot ${c ? "" : "empty"}" data-id="${c ? esc(c.id) : ""}" ${c && live ? "" : "disabled"}>
+      return `<button type="button" class="gd-slot ${c ? "" : "empty"}" data-id="${c ? esc(c.id) : ""}" ${c && live && !boardAsks ? "" : "disabled"}>
         <span>${q + 1}</span><b>${c ? esc(c.name) : "—"}</b></button>`;
     }).join("");
     setHtml($(".gd-slots"), slots);
@@ -168,14 +177,45 @@ export function mount(root, ctx) {
     const t = e.target.closest(".gd-tab");
     if (t) showTab(t.dataset.tab);
   });
-  $(".gd-prev").addEventListener("click", () => send("select", { step: -1 }));
-  $(".gd-next").addEventListener("click", () => send("select", { step: 1 }));
+  /**
+   * A switch to another preset asked for here (`intent` with its payload). With the table's setting on and unsaved
+   * changes, the phone asks first whether to save them; the board cannot switch while it asks (E-021).
+   */
+  function switchFromPhone(target, intent, payload) {
+    if (!view || view.confirming === "board") return;
+    const p = view.pedal;
+    if (!info?.prefs?.confirm || !p.modified || !target) return send(intent, payload);
+    const from = label(p.current), to = label(target);
+    const name = p.names[p.current - 1]?.trim() || from;
+    ask = { intent, payload, current: p.current };
+    $(".gd-ask-title").textContent = `Save the changes to ${from}?`;
+    $(".gd-ask-text").textContent = `"${name}" has unsaved changes. ${to === from ? `Selecting ${to} again reloads it and` : `Switching to ${to}`} discards them, unless you save them to ${from} first.`;
+    $(".gd-ask-wrap").hidden = false;
+    send("confirm", { from: "deck", on: true });
+  }
+  /** Answer the question: `save` (true/false) switches, null cancels. */
+  function answer(save) {
+    const a = ask;
+    ask = null;
+    $(".gd-ask-wrap").hidden = true;
+    if (!a) return;
+    if (save === null) send("confirm", { from: "deck", on: false });
+    else send(a.intent, { ...a.payload, ...(save ? { save: true } : {}) }); // (closes the question too)
+  }
+  $(".gd-ask-save").addEventListener("click", () => answer(true));
+  $(".gd-ask-discard").addEventListener("click", () => answer(false));
+  $(".gd-ask-cancel").addEventListener("click", () => answer(null));
+  const stepTarget = (step) => (view?.pedal.current ? ((view.pedal.current - 1 + step + 400) % 200) + 1 : 0);
+  $(".gd-prev").addEventListener("click", () => switchFromPhone(stepTarget(-1), "select", { step: -1 }));
+  $(".gd-next").addEventListener("click", () => switchFromPhone(stepTarget(1), "select", { step: 1 }));
   $(".gd-slots").addEventListener("click", (e) => {
     const b = e.target.closest(".gd-slot");
-    if (b?.dataset.id) {
-      ctx.vibrate(30);
-      send("apply", { id: b.dataset.id });
-    }
+    if (!b?.dataset.id || !view) return;
+    ctx.vibrate(30);
+    // a configuration on another preset switches to it first
+    const c = view.configs.find((x) => x.id === b.dataset.id);
+    if (c?.preset && c.preset !== view.pedal.current) switchFromPhone(c.preset, "apply", { id: c.id });
+    else send("apply", { id: b.dataset.id });
   });
   $(".gd-minus").addEventListener("click", () => send("click", { bpm: Math.max(30, view.tempo - 1), follow: false }));
   $(".gd-plus").addEventListener("click", () => send("click", { bpm: Math.min(300, view.tempo + 1), follow: false }));
@@ -208,8 +248,11 @@ export function mount(root, ctx) {
     if (d) send("edit", { id: d.dataset.id, remove: true });
   });
   return {
-    update(v) {
+    update(v, _events, i) {
       view = v;
+      info = i ?? info;
+      if (ask && (v.pedal.current !== ask.current || v.done)) answer(null); // the pedal switched by itself: moot
+      else if (!ask && v.confirming === "deck" && !v.done) send("confirm", { from: "deck", on: false }); // left over from before a reload
       if (ctx.store) {
         // The table keeps the configurations and the board has brought them (E-017): what this phone kept before
         // joins them, once, and from then on the phone keeps nothing.
