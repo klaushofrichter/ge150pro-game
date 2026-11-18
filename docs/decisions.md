@@ -222,3 +222,14 @@ Records are history: an older record is not edited when a newer one changes it. 
   its cache. The game now adds its own `?v=…` (from `import.meta.url`) to its stylesheet and to `ge150.js`. Checked
   on the pedal: selecting from the banks window sets the preset's own EXP target (no *), Reset and Reload saved go
   back to the saved preset.
+- **E-031 · 2026-11-18 · Klaus** — The phone's tabs are **Preset**, **Rhythm** and **Config** (was Pedal). Preset:
+  the preset card (with the expression pedal's mode as a badge: **VOL**, or **EXP** with the parameter and its value),
+  **◀ ▶**, and the player's **favorites**: up to 12 presets, added with **+** on the card or by dragging the card down
+  onto the list, sorted by dragging an entry's grip, removed with **−**, selected with a tap (asking about unsaved
+  changes as ◀ ▶ do). An entry shows its bank and letter, its name, and **modified** for the playing preset with
+  unsaved changes. The favorites are kept in the phone's browser by label ("23A"); other presets loaded into the pedal
+  are not noticed. Config: the eight quick slots as before (moved from Preset), then configurations not on a slot,
+  then the pedal's connection; a tap loads a configuration, a long press opens what it sets with **Rename**,
+  **Remove** (after asking) and **Close**. The rules shown on the phone describe both tabs. *Implementation (Claude):*
+  pointer events for the drags (the sorting listens on the window: moving the entry in the page would drop a pointer
+  capture), a 550 ms hold for the details.

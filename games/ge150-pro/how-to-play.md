@@ -8,10 +8,10 @@ the pedal: your guitar plays through the pedal as always.
 - One player, with the GE150 Pro connected to the table by USB.
 - The **board** shapes the sound: modules, models, parameters, presets.
 - **Save configuration…** puts a sound on a phone **quick slot** or a footswitch.
-- The **phone** recalls quick slots, runs a click and shows the drum machine.
+- The **phone** steps through presets and your favorites, recalls quick slots, runs a click and shows the drum machine.
 - Leave the game through the player tab at the top of your phone.
 
-![The board with the signal chain, faders and presets; the phone with quick slots](assets/img/layout.svg)
+![The board with the signal chain, faders and presets; the phone with favorites and quick slots](assets/img/layout.svg)
 
 ## Connecting the pedal
 
@@ -55,12 +55,26 @@ board says so and changes nothing on the pedal: update it with Mooer's editor.
 A configuration is a set of modules exactly as they are now, saved from the board with **Save configuration…**. Choose
 the modules it sets (the ones you changed are marked), whether it first selects the current preset, and where it goes:
 
-- a **quick slot** (1 to 8) on your phone's **Preset** tab: tap the slot while you play;
+- a **quick slot** (1 to 8) on your phone's **Config** tab: tap the slot while you play;
 - a **footswitch**: when you select this preset with the pedal's footswitch, the configuration is applied right after.
 
-The table keeps the configurations between games, for everyone who plays here; rename or delete them on your phone's
-**Pedal** tab. (Ones an earlier version kept on your phone move to the table the first time you play.) The table's
+The table keeps the configurations between games, for everyone who plays here; hold one on your phone's
+**Config** tab to rename or remove it. (Ones an earlier version kept on your phone move to the table the first time you play.) The table's
 people can export, import or delete them all under **Advanced › Game data** on the board.
+
+## The phone
+
+The card at the top shows the preset that plays (* for unsaved changes) and the expression pedal's mode: **VOL** in
+volume mode, **EXP** with the value it sets in EXP mode. Tap the card to see what the preset plays, module by module.
+
+- **Preset**: **◀ ▶** step through the presets. Below are your **favorites**, up to 12 presets in your own order, kept
+  on this phone: tap **+** on the card (or drag the card down onto the list) to add the preset that plays. Tap a
+  favorite to select it, **−** removes it, and drag it by **⋮⋮** to sort the list. The playing preset is marked and
+  shows **modified** with unsaved changes. Favorites remember the bank and letter (23A): if other presets are loaded
+  into the pedal, they show what is there now.
+- **Rhythm**: below.
+- **Config**: the configurations, the eight quick slots first, then any not on a slot, and the pedal's connection.
+  Tap one to load it on the pedal; **hold** it to see what it sets, **Rename** it or **Remove** it (after asking).
 
 ## Rhythm
 

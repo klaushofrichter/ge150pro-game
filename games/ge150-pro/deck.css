@@ -19,7 +19,42 @@
 .gd-slot b { font-size: 1.05em; word-break: break-word; }
 .gd-slot.empty { opacity: 0.45; }
 .gd-slot:active:not(:disabled) { background: var(--brass); color: #1b1407; }
-.gd-exp { font-size: 0.9em; }
+.gd-slot:disabled:not(.empty) { opacity: 0.7; }
+.gd-others { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gd-others:empty { display: none; }
+
+/* The preset card (E-031): the EXP mode as a badge; + adds the preset to the favorites, or drag the card down. */
+.gd-now { touch-action: none; transition: box-shadow 0.15s; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.gd-now.dragging { position: relative; z-index: 4; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 0 2px var(--brass); }
+.gd-now-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.gd-exp-badge { font-size: 0.75em; font-weight: 700; letter-spacing: 0.12em; padding: 3px 10px; border-radius: 999px;
+  background: var(--brass); color: #1b1407; border: 2px solid var(--brass); max-width: 60%; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.gd-exp-badge.vol { background: none; color: var(--brass); }
+.gd-name-row { display: flex; align-items: center; gap: 8px; }
+.gd-name-row .gd-name { flex: 1; min-width: 0; }
+.gd-fav-add { display: none; flex: none; width: 52px; min-height: 52px; padding: 0; font-size: 1.6em; border-radius: 50%; }
+.gd-on-play .gd-fav-add { display: block; }
+
+/* The favorites (E-031): up to 12, scrolling inside the page; ⋮⋮ sorts, − removes. */
+.gd-favs-head { display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px; }
+.gd-favs-count { font-size: 0.8em; }
+.gd-favs { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 60px; border-radius: 14px;
+  outline: 2px dashed transparent; outline-offset: 2px; }
+.gd-favs.drop { outline-color: var(--brass); background: rgba(214, 169, 74, 0.08); }
+.gd-fav { display: flex; align-items: stretch; gap: 6px; flex: none; }
+.gd-fav.lifted { opacity: 0.85; }
+.gd-fav.lifted .gd-fav-pick { border-color: var(--brass); }
+.gd-fav-grip { flex: none; width: 36px; display: flex; align-items: center; justify-content: center; color: var(--ink-soft);
+  font-size: 1.2em; letter-spacing: -0.2em; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.gd-fav-pick { flex: 1; min-width: 0; min-height: 56px; display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+  text-align: left; border-radius: 14px; }
+.gd-fav-pick b { flex: none; color: var(--brass); font-size: 0.85em; letter-spacing: 0.08em; min-width: 2.6em; }
+.gd-fav-pick span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-fav.on .gd-fav-pick { border-color: var(--brass); background: rgba(214, 169, 74, 0.16); }
+.gd-mod { flex: none; font-style: normal; font-size: 0.7em; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px;
+  border-radius: 999px; border: 1px solid var(--brass); color: var(--brass); }
+.gd-fav-del { flex: none; width: 52px; padding: 0; font-size: 1.5em; }
 
 .gd-pr-row { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
 .gd-beat { flex: none; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.08);
@@ -41,14 +76,6 @@
 
 .gd-status-text { font-size: 1.05em; margin-top: 2px; }
 .gd-req { font-size: 0.8em; margin-top: 6px; }
-.gd-list { display: flex; flex-direction: column; gap: 6px; }
-.gd-config { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1); }
-.gd-config-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.gd-config-text b { word-break: break-word; }
-.gd-config-text span { font-size: 0.8em; }
-.gd-rename, .gd-delete { min-height: 44px; flex: none; }
-.gd-delete { width: 48px; padding: 0; }
 .gd-empty { font-size: 0.9em; padding: 6px 2px; }
 
 /* The "save before switching?" question (E-021): over the page, the buttons stacked for one thumb. */
