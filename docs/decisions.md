@@ -152,3 +152,7 @@ Records are history: an older record is not edited when a newer one changes it. 
   footswitch switch on the pedal closes the question (moot); a screen reloaded with its question open clears it. The
   pedal's footswitches cannot be held, so they never ask. Checks: rules test for the lock, browser check (both
   screens: save then switch in that order, cancel, discard).
+- **E-022 · 2026-11-17 · Klaus** — The board's **Save…** is now **Save preset…**, apart from Save configuration…; a
+  configuration's **Apply** is **Load**. Tapping a configuration's name opens what it sets: the preset it selects (or
+  the one playing), its quick slot and footswitch, and each stored module with its switch, model and values (the other
+  modules stay as they are), with Load and Close.

@@ -1,6 +1,6 @@
 """Browser check for the GE150 Pro flows beyond the first session (scripts/e2e/ge150_pro.py covers that), on a real
 games-service Table Host with the simulated pedal (fake_pedal.js):
-  - Save… asks first; Cancel sends nothing; Save writes the preset slot (C3) and the unsaved mark goes away;
+  - Save preset… asks first; Cancel sends nothing; Save writes the preset slot (C3) and the unsaved mark goes away;
   - choosing another model in the model window changes the module's model on the pedal;
   - with the board closed, a phone command waits; a new board carries it out once, and a reload does not repeat it;
   - configurations kept on the phone come back in the next game;
@@ -61,7 +61,7 @@ def main():
             start_game(board, deck)
             connected(board)
 
-            # Save…: Cancel sends nothing; Save writes the slot and clears the unsaved mark.
+            # Save preset…: Cancel sends nothing; Save writes the slot and clears the unsaved mark.
             board.locator(".gp-power[data-power='1']").click()
             wait(lambda: board.locator(".gp-name").inner_text().endswith("*"), 5, "the unsaved mark")
             board.locator(".gp-save").click()
