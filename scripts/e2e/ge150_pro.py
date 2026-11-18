@@ -293,6 +293,22 @@ def main():
             assert deck.locator("button", has_text="Finish").count() == 0, "no Finish on the phone"
             check(deck, "phone Pedal")
             shot(deck, "phone-pedal")
+
+            # E-025: tapping "Connected" on the board offers to disconnect; only Connect pedal connects again.
+            board.locator(".gp-conn-text").click()
+            board.wait_for_selector(".gp-sheet .gp-yes")
+            assert "Disconnect" in board.locator(".gp-sheet-title").inner_text()
+            board.locator(".gp-sheet .gp-no").click()
+            assert board.locator(".gp-dot[data-state=on]").count() == 1, "Cancel stays connected"
+            board.locator(".gp-conn-text").click()
+            shot(board, "board-disconnect")
+            board.locator(".gp-sheet .gp-yes").click()
+            wait(lambda: board.locator(".gp-conn-text").inner_text() == "Disconnected", 5, "the board to let go of the pedal")
+            wait(lambda: "Disconnected" in deck.locator(".gd-status-text").inner_text(), 5, "the phone to see it")
+            time.sleep(1.5)  # updates arrive meanwhile: the board does not connect again by itself
+            assert board.locator(".gp-dot[data-state=on]").count() == 0, "no reconnect without a touch"
+            board.locator(".gp-connect").click()
+            wait(lambda: board.locator(".gp-dot[data-state=on]").count(), 10, "Connect pedal to connect again")
             a("POST", "/game/end")
             wait(lambda: a("GET", "/state")["phase"] != "active", 10, "the game to end")
             shot(board, "board-end")

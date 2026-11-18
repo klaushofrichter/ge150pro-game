@@ -25,6 +25,7 @@ const STATES = {
   loading: { title: "Connecting…", text: "Loading the presets…" },
   connected: { title: "Connected", text: "" },
   unplugged: { title: "Pedal disconnected", text: "Plug it in again.", retry: true },
+  released: { title: "Disconnected", text: "The table let go of the pedal: Mooer's editor or the web editor can use it now. Tap Connect pedal to connect again.", retry: true },
   unsupported: { title: "Firmware not supported",
     text: `The game needs firmware ${MIN_FIRMWARE} or newer. Update the pedal with Mooer's editor; the game changes nothing on this pedal.` },
   error: { title: "Pedal error", text: "" },
@@ -121,6 +122,8 @@ export function mount(root, ctx) {
   let pending = {}, reportTimer = null;
   /** This board's "save before switching?" sheet is open (E-021); a store waiting for the pedal's acknowledgement. */
   let asking = false, storedWait = null;
+  /** The player disconnected the pedal (E-025): the board does not connect again by itself. */
+  let released = false;
   const sendTimers = new Map(), sendNext = new Map(), editedAt = new Map();
 
   const playerSeat = () => (view ? view.seat : null);
@@ -204,7 +207,13 @@ export function mount(root, ctx) {
 
   async function connect(fromTouch) {
     if (!plays() || dev || opening || dead) return;
+    // after Disconnect only a touch connects again, not an update or a hotplug (E-025)
+    if (released && !fromTouch) return;
+    released = false;
     opening = true; // before any await: a second call (an update, a hotplug) waits for this one
+    // Chrome's device chooser ends fullscreen: back to it once the choice is made (E-026)
+    const fs = fullscreenDoc();
+    const wasFull = fromTouch && !!fs.fullscreenElement;
     try {
       await loadLib();
       if (!navigator.hid) return status("noHid");
@@ -229,8 +238,32 @@ export function mount(root, ctx) {
       status(fromTouch && e?.name === "NotFoundError" ? "notChosen" : "noPedal");
     } finally {
       opening = false;
+      if (wasFull && !fs.fullscreenElement) refullscreen(fs);
       draw();
     }
+  }
+
+  /** The document the table's Fullscreen applies to: the whole page when the board is framed in it (same origin). */
+  function fullscreenDoc() {
+    try {
+      return window.parent !== window && window.parent.document ? window.parent.document : document;
+    } catch {
+      return document;
+    }
+  }
+
+  /** Back to fullscreen: at once if the browser still allows it, else with the next touch anywhere on the page. */
+  function refullscreen(fs) {
+    fs.documentElement.requestFullscreen().catch(() => {
+      const win = fs.defaultView ?? window;
+      const again = () => {
+        win.removeEventListener("pointerdown", again, true);
+        window.removeEventListener("pointerdown", again, true);
+        if (!fs.fullscreenElement) fs.documentElement.requestFullscreen().catch(() => {});
+      };
+      win.addEventListener("pointerdown", again, true);
+      window.addEventListener("pointerdown", again, true);
+    });
   }
 
   function status(key, detail = "") {
@@ -492,6 +525,7 @@ export function mount(root, ctx) {
     $(".gp-label").textContent = idx ? (lib ? lib.presetLabel(idx) : "") : "";
     drawName(idx ? nameOf(idx) || "—" : null, local ? modifiedNow() : ped.modified);
     $(".gp-connect").hidden = !local || !!dev || view.done;
+    $(".gp-conn").classList.toggle("can-release", local && !!dev && state.key === "connected" && !view.done);
     $(".gp-save").hidden = !local || !dev || !ready || view.done;
     if (!local) $(".gp-conn-text").textContent = ped.connected ? "Pedal connected at the table" : ped.text || "Waiting for the pedal at the table";
     if (!local) $(".gp-dot").dataset.state = ped.connected ? "on" : "off";
@@ -695,6 +729,20 @@ export function mount(root, ctx) {
     );
   }
 
+  /** Tap "Connected": let go of the pedal, after asking, so another program can use it (E-025). */
+  function askDisconnect() {
+    if (!plays() || !dev || state.key !== "connected") return;
+    const unsaved = modifiedNow() ? " The unsaved changes stay on the pedal until it switches presets; Save preset… keeps them." : "";
+    ask("Disconnect the pedal?", `The table lets go of the GE150 Pro, so Mooer's editor or the GE150 Pro Editor web app can use it. The pedal keeps playing.${unsaved} Connect pedal connects again.`, "Disconnect", () => {
+      released = true;
+      const d = dev;
+      reset();
+      d?.close().catch(() => {});
+      status("released");
+      draw();
+    });
+  }
+
   /** A small question in the board's sheet: Cancel and one action. */
   function ask(title, text, action, run) {
     openSheet(
@@ -880,6 +928,8 @@ export function mount(root, ctx) {
 
   // ---- touch -----------------------------------------------------------------------------------------------------
   $(".gp-connect").addEventListener("click", () => connect(true));
+  $(".gp-conn-text").addEventListener("click", askDisconnect);
+  $(".gp-dot").addEventListener("click", askDisconnect);
   $(".gp-notice-connect").addEventListener("click", () => connect(true));
   $(".gp-save").addEventListener("click", openSave);
   $(".gp-now").addEventListener("click", openPresetInfo);
