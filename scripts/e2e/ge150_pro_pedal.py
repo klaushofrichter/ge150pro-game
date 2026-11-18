@@ -40,7 +40,7 @@ def conn(board):
 
 
 def phone_status(deck):
-    deck.locator(".gd-tab[data-tab=setup]").click()
+    deck.locator(".gd-tab[data-tab=config]").click()
     return deck.locator(".gd-status-text").inner_text()
 
 
@@ -69,7 +69,7 @@ def main():
             assert board.locator(".gp-notice-connect").is_visible(), "and in the notice panel"
             req = board.locator(".gp-req").inner_text()
             assert "GE150 Pro" in req and "V2.1.2 or newer" in req, f"the notice names the required device and firmware: {req}"
-            deck.locator(".gd-tab[data-tab=setup]").click()
+            deck.locator(".gd-tab[data-tab=config]").click()
             assert "V2.1.2 or newer" in deck.locator(".gd-req").inner_text(), "the phone names the required firmware"
             wait(lambda: "No pedal" in phone_status(deck), 5, "the phone to say there is no pedal")
             shot(board, "no-pedal")

@@ -32,6 +32,16 @@ T = TableCheck(BASE, KEY, OUT, "ge150-pro", CHECK)
 a, shot, check, phone, problems = T.a, T.shot, T.check, T.phone, T.problems
 
 
+def hold(page, loc, ms=800):
+    """A long press with one finger (the mouse stands in for it)."""
+    loc.scroll_into_view_if_needed()
+    b = loc.bounding_box()
+    page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2)
+    page.mouse.down()
+    page.wait_for_timeout(ms)
+    page.mouse.up()
+
+
 def main():
     proc = start_table(PORT, TABLE_KEY=KEY, GAMES_DIR=os.path.join(ROOT, "games"), PUBLIC_URL=BASE)
     try:
@@ -172,7 +182,7 @@ def main():
             board.locator(".gp-sheet .gp-no").click()
             deck.locator(".gd-now").click()
             wait(lambda: deck.locator(".gd-info-wrap").is_visible(), 5, "the phone's preset window")
-            wait(lambda: deck.locator(".gd-info-mod").count() == 9 and "GAIN" in deck.locator(".gd-info-mods").inner_text(), 5, "the modules with values on the phone")
+            wait(lambda: deck.locator(".gd-info-wrap .gd-info-mod").count() == 9 and "GAIN" in deck.locator(".gd-info-wrap .gd-info-mods").inner_text(), 5, "the modules with values on the phone")
             shot(deck, "phone-preset-info")
             deck.locator(".gd-info-close").click()
 
@@ -190,12 +200,18 @@ def main():
             board.locator(".gp-delete").first.click()
             board.locator(".gp-sheet .gp-yes").click()
             wait(lambda: board.locator(".gp-config").count() == 1, 5, "the board's delete")
-            deck.locator(".gd-tab[data-tab=setup]").click()
-            deck.locator(".gd-delete").first.click()
-            wait(lambda: deck.locator(".gd-del-wrap").is_visible(), 5, "the phone to ask before deleting")
+            deck.locator(".gd-tab[data-tab=config]").click()
+            # E-031: holding a configuration opens its details with Rename and Remove; a tap loads it
+            hold(deck, deck.locator(".gd-slot:not(.empty)").first)
+            wait(lambda: deck.locator(".gd-cfg-wrap").is_visible(), 5, "the configuration's details after a long press")
+            assert deck.locator(".gd-cfg-mods .gd-info-mod").count() >= 1, deck.locator(".gd-cfg-wrap").inner_text()
+            shot(deck, "phone-config-details")
+            deck.locator(".gd-cfg-remove").click()
+            wait(lambda: deck.locator(".gd-del-wrap").is_visible(), 5, "the phone to ask before removing")
             deck.locator(".gd-del-no").click()
-            assert deck.locator(".gd-config").count() == 1, "Cancel on the phone keeps it"
-            deck.locator(".gd-delete").first.click()
+            assert deck.locator(".gd-slot:not(.empty)").count() == 1, "Cancel on the phone keeps it"
+            hold(deck, deck.locator(".gd-slot:not(.empty)").first)
+            deck.locator(".gd-cfg-remove").click()
             deck.locator(".gd-del-yes").click()
             wait(lambda: board.locator(".gp-config").count() == 0, 5, "the phone's delete")
             deck.locator(".gd-tab[data-tab=play]").click()
@@ -212,8 +228,11 @@ def main():
             wait(lambda: "Preset 6" in board.locator(".gp-name").inner_text(), 5, "the board to show 2B")
             wait(lambda: "Preset 6" in deck.locator(".gd-name").inner_text(), 5, "the phone to show 2B")
             before = sent(board, 0x83)
+            deck.locator(".gd-tab[data-tab=config]").click()
             deck.locator(".gd-slot:not(.empty)").first.click()
             wait(lambda: sent(board, 0x83) > before, 5, "the pedal to receive the recalled configuration")
+            assert deck.locator(".gd-cfg-wrap").is_hidden(), "a tap loads, it opens no window"
+            deck.locator(".gd-tab[data-tab=play]").click()
             assert board.evaluate("() => window.__pedal.state.live[1].on") is True, "the configuration switches DS on"
             assert board.evaluate("() => window.__pedal.state.live[2].values[0]") == amp, "the configuration sets AMP's value"
 
@@ -233,10 +252,44 @@ def main():
             board.evaluate("() => window.__pedal.pressGarbled(5)")
             wait(lambda: sent(board, 0x83) > before, 5, "the footswitch to apply the configuration after a damaged report")
             wait(lambda: "bad CRC" in board.locator(".gp-conn-text").inner_text(), 5, "the board to note the damaged report")
-            deck.locator(".gd-tab[data-tab=setup]").click()
+            deck.locator(".gd-tab[data-tab=config]").click()
             status = deck.locator(".gd-status-text").inner_text()
             assert status.startswith("Connected"), f"the phone still sees a connected pedal: {status}"
             deck.locator(".gd-tab[data-tab=play]").click()
+
+            # E-031: favorites on the Preset tab: + adds the playing preset, the card dragged down too; sorted by the
+            # grip, − removes, a tap selects; kept on this phone by label. The EXP mode is a badge on the card.
+            assert deck.locator(".gd-slots").is_hidden(), "no quick slots on the Preset tab"
+            assert deck.locator(".gd-exp-badge").is_visible() and deck.locator(".gd-exp-badge").inner_text().startswith("EXP"), deck.locator(".gd-exp-badge").inner_text()
+            deck.locator(".gd-fav-add").click()  # 2A
+            wait(lambda: deck.locator(".gd-fav").count() == 1, 5, "the first favorite")
+            assert deck.locator(".gd-fav-add").is_disabled(), "a favorite already: no second +"
+            deck.locator(".gd-next").click()
+            wait(lambda: "Preset 6" in deck.locator(".gd-name").inner_text(), 5, "the phone on 2B")
+            card = deck.locator(".gd-now").bounding_box()
+            favs = deck.locator(".gd-favs").bounding_box()
+            deck.mouse.move(card["x"] + 60, card["y"] + 20)
+            deck.mouse.down()
+            deck.mouse.move(card["x"] + 60, favs["y"] + 30, steps=10)
+            deck.mouse.up()
+            wait(lambda: deck.locator(".gd-fav").count() == 2, 5, "the card dragged onto the list")
+            assert deck.locator(".gd-info-wrap").is_hidden(), "a drag opens no preset window"
+            order = lambda: deck.evaluate("() => [...document.querySelectorAll('.gd-fav b')].map((b) => b.textContent)")
+            assert order() == ["2A", "2B"], order()
+            g = deck.locator(".gd-fav-grip").nth(1).bounding_box()
+            top = deck.locator(".gd-fav").nth(0).bounding_box()
+            deck.mouse.move(g["x"] + g["width"] / 2, g["y"] + g["height"] / 2)
+            deck.mouse.down()
+            deck.mouse.move(g["x"] + g["width"] / 2, top["y"] + 4, steps=8)
+            deck.mouse.up()
+            wait(lambda: order() == ["2B", "2A"], 5, "2B sorted to the top")
+            assert deck.evaluate("() => localStorage.getItem('ge150-pro.favorites')") == '["2B","2A"]'
+            shot(deck, "phone-favorites")
+            deck.locator(".gd-fav-pick[data-index='5']").click()
+            wait(lambda: board.evaluate("() => window.__pedal.state.current") == 5, 5, "the favorite selects 2A")
+            time.sleep(0.8)  # (the pedal loads it, the board reads it back)
+            deck.locator(".gd-fav-del[data-index='6']").click()
+            wait(lambda: order() == ["2A"], 5, "− removes 2B")
 
             # E-021: with "Confirm when changing presets after edits" on, a switch with unsaved changes asks first, on
             # the screen it was asked for; the other screen cannot switch meanwhile.
@@ -343,13 +396,14 @@ def main():
             deck.locator(".gd-start").click()
 
             # The Pedal tab: the preset card stays, no Finish (the game is left through the platform's player tab).
-            deck.locator(".gd-tab[data-tab=setup]").click()
+            deck.locator(".gd-tab[data-tab=config]").click()
             tabs_on = deck.evaluate("() => [...document.querySelectorAll('.gd-tab.on')].map((b) => b.dataset.tab)")
-            assert tabs_on == ["setup"], f"the Pedal tab is the one marked: {tabs_on}"
+            assert tabs_on == ["config"], f"the Config tab is the one marked: {tabs_on}"
+            assert deck.locator(".gd-tab[data-tab=config]").inner_text() == "Config"
             assert deck.locator(".gd-now").is_visible(), "the preset card shows on every tab"
             assert deck.locator("button", has_text="Finish").count() == 0, "no Finish on the phone"
-            check(deck, "phone Pedal")
-            shot(deck, "phone-pedal")
+            check(deck, "phone Config")
+            shot(deck, "phone-config")
 
             # E-025: tapping "Connected" on the board offers to disconnect; only Connect pedal connects again.
             board.locator(".gp-conn-text").click()
