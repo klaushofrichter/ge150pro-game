@@ -3,6 +3,9 @@
 // (E-002); a remote board shows the state and a note. The protocol library is assets/ge150.js (src/ge150/).
 import * as kit from "/shared/board-kit.js";
 const { audio: sharedAudio, esc, html, seatPlates, useStyles } = kit;
+/** The version the table loaded this file with (`?v=…`): the stylesheet and the library too, so an update is not
+ * served from the browser's cache (the table versions only this file). */
+const VERSIONED = new URL(import.meta.url).search;
 /** The platform's wide scrollbar for a finger (D-306), where the table has it; else the browser's own. */
 const touchScroll = (el) => kit.touchScroll?.(el);
 
@@ -62,7 +65,7 @@ export function settings({ info, setPrefs }) {
 }
 
 export function mount(root, ctx) {
-  useStyles(`/games/${ID}/board.css`);
+  useStyles(`/games/${ID}/board.css${VERSIONED}`);
   const box = html(`<div class="gp-root">
     <div class="gp-bar">
       <div class="gp-conn"><span class="gp-dot"></span><div class="gp-conn-text"></div>
@@ -209,7 +212,7 @@ export function mount(root, ctx) {
 
   // ---- the pedal ------------------------------------------------------------------------------------------------
   async function loadLib() {
-    lib ??= await import(ctx.assetUrl("ge150.js"));
+    lib ??= await import(ctx.assetUrl("ge150.js") + VERSIONED);
     return lib;
   }
 
