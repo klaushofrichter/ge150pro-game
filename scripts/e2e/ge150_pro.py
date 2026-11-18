@@ -297,6 +297,7 @@ def main():
             wait(lambda: "vol" in (gain.get_attribute("class") or ""), 5, "the outlined EXP in volume mode")
             assert "vol" in board.locator(".gp-tile[data-slot='2'] .gp-exp-badge").get_attribute("class"), "the badge outlined too"
             assert board.locator(".gp-exp-note").is_visible(), "the volume-mode note"
+            board.wait_for_timeout(300)  # the platform fades button backgrounds (0.15 s)
             shot(board, "board-exp-volume")
             reads = sent(board, 0xb0)
             gain.click()
@@ -346,6 +347,9 @@ def main():
             wait(lambda: board.locator(".gp-conn-text").inner_text() == "Disconnected", 5, "the board to let go of the pedal")
             wait(lambda: "Disconnected" in deck.locator(".gd-status-text").inner_text(), 5, "the phone to see it")
             time.sleep(1.5)  # updates arrive meanwhile: the board does not connect again by itself
+            assert "github.io/ge150pro-editor" in board.locator(".gp-notice-text").inner_text(), "the web editor's address"
+            assert "CALIBRATE" in board.locator(".gp-req").inner_text(), "the calibration note"
+            shot(board, "board-released")
             assert board.locator(".gp-dot[data-state=on]").count() == 0, "no reconnect without a touch"
             board.locator(".gp-connect").click()
             wait(lambda: board.locator(".gp-dot[data-state=on]").count(), 10, "Connect pedal to connect again")
