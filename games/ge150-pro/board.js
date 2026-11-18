@@ -62,7 +62,7 @@ export function mount(root, ctx) {
       <div class="gp-conn"><span class="gp-dot"></span><div class="gp-conn-text"></div>
         <button class="gp-btn primary gp-connect" type="button" hidden>Connect pedal</button></div>
       <div class="gp-now"><div class="gp-label"></div><div class="gp-name"></div></div>
-      <div class="gp-bar-right"><button class="gp-btn gp-save" type="button">Save…</button></div>
+      <div class="gp-bar-right"><button class="gp-btn gp-save" type="button">Save preset…</button></div>
     </div>
     <div class="gp-chain" role="list"></div>
     <div class="gp-main">
@@ -595,9 +595,9 @@ export function mount(root, ctx) {
     const rows = (view.configs ?? []).map((c) => {
       const what = Object.keys(c.modules).map((k) => lib?.catalog.slots[Number(k)].name ?? k).join(", ");
       const tags = c.tags ?? [];
-      return `<div class="gp-config"><div class="gp-config-text"><b>${esc(c.name)}</b><span class="muted">${esc(what || "preset only")}</span>
+      return `<div class="gp-config"><div class="gp-config-text" role="button" tabindex="0" data-id="${esc(c.id)}" title="What ${esc(c.name)} sets"><b>${esc(c.name)}</b><span class="muted">${esc(what || "preset only")}</span>
           <span class="gp-tags">${tags.map((t) => `<i>${esc(t)}</i>`).join("")}</span></div>
-        <button type="button" class="gp-btn gp-apply" data-id="${esc(c.id)}" ${canSwitch() ? "" : "disabled"}>Apply</button>
+        <button type="button" class="gp-btn gp-apply" data-id="${esc(c.id)}" ${canSwitch() ? "" : "disabled"}>Load</button>
         <button type="button" class="gp-btn gp-delete" data-id="${esc(c.id)}" aria-label="Delete ${esc(c.name)}" ${plays() && !view.done ? "" : "disabled"}>✕</button></div>`;
     }).join("");
     const list = rows || `<div class="gp-empty muted">No configurations yet. Shape the sound, then Save configuration… to put it on a quick slot of the phone or on a footswitch.</div>`;
@@ -672,7 +672,7 @@ export function mount(root, ctx) {
     if (!canEdit()) return;
     const label = lib.presetLabel(current);
     openSheet(
-      `<div class="gp-sheet-head"><div class="gp-sheet-title">Save to ${esc(label)}?</div></div>
+      `<div class="gp-sheet-head"><div class="gp-sheet-title">Save preset ${esc(label)}?</div></div>
       <p class="gp-sheet-text">This overwrites the preset stored in slot ${esc(label)} on the pedal with the sound it plays now.
         The pedal keeps it without the table.</p>
       <div class="gp-sheet-btns"><button type="button" class="gp-btn gp-no">Cancel</button><button type="button" class="gp-btn primary gp-yes">Save to ${esc(label)}</button></div>`,
@@ -681,6 +681,45 @@ export function mount(root, ctx) {
         el.querySelector(".gp-yes").onclick = () => {
           closeSheet();
           later(storeCurrent);
+        };
+      },
+    );
+  }
+
+  /** Load a configuration on the pedal: one on another preset switches to it first (asking about unsaved changes). */
+  function loadConfig(c) {
+    if (c.preset && c.preset !== current) switchFromBoard(c.preset, () => applyConfig(c, false));
+    else if (canSwitch()) later(() => applyConfig(c, false));
+  }
+
+  /** What a configuration sets: its preset, slot and footswitch, and each stored module with its values. */
+  function openConfig(c) {
+    if (!lib) return;
+    const where = [
+      c.preset ? `Selects ${esc(lib.presetLabel(c.preset))} ${esc(stored.get(c.preset)?.name?.trim() ?? "")} first.` : "Changes the preset that plays.",
+      ...(c.tags ?? []).filter((t) => !t.startsWith("on ")).map((t) => esc(t)),
+    ].join(" · ");
+    const mods = Object.entries(c.modules)
+      .map(([k, m]) => {
+        const s = Number(k);
+        const mm = lib.model(s, m.type);
+        const vals = m.on && mm ? mm.params.map((p) => `<span><i>${esc(p.name)}</i> ${esc(lib.formatValue(p, m.values[p.pos]))}</span>`).join("") : "";
+        return `<div class="gp-cfg-mod"><div class="gp-cfg-mod-head"><b>${esc(lib.catalog.slots[s].name)}</b>
+          <span>${m.on ? "On" : "Off"}${mm ? ` · ${esc(mm.name)}` : ""}</span></div>${vals ? `<div class="gp-cfg-vals">${vals}</div>` : ""}</div>`;
+      })
+      .join("");
+    openSheet(
+      `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(c.name)}</div></div>
+      <p class="gp-sheet-text">${where}</p>
+      <div class="gp-cfg-mods">${mods || `<div class="muted">No module settings: it only selects the preset.</div>`}</div>
+      <p class="gp-sheet-text muted">${Object.keys(c.modules).length < 9 ? "The other modules stay as they are. " : ""}Load sets these values on the pedal now, as unsaved changes; Save preset… keeps them.</p>
+      <div class="gp-sheet-btns"><button type="button" class="gp-btn gp-no">Close</button>
+        <button type="button" class="gp-btn primary gp-yes" ${canSwitch() ? "" : "disabled"}>Load</button></div>`,
+      (el) => {
+        el.querySelector(".gp-no").onclick = closeSheet;
+        el.querySelector(".gp-yes").onclick = () => {
+          closeSheet();
+          loadConfig(c);
         };
       },
     );
@@ -786,8 +825,13 @@ export function mount(root, ctx) {
     const a = e.target.closest(".gp-apply");
     if (a) {
       const c = view.configs.find((x) => x.id === a.dataset.id);
-      // a configuration on another preset switches to it first
-      if (c) c.preset && c.preset !== current ? switchFromBoard(c.preset, () => applyConfig(c, false)) : canSwitch() && later(() => applyConfig(c, false));
+      if (c) loadConfig(c);
+      return;
+    }
+    const t = e.target.closest(".gp-config-text");
+    if (t) {
+      const c = view.configs.find((x) => x.id === t.dataset.id);
+      if (c) openConfig(c);
       return;
     }
     const d = e.target.closest(".gp-delete");
