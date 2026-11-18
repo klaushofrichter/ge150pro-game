@@ -132,6 +132,17 @@ def main():
             name = deck.locator(".gd-slot:not(.empty) b").first.inner_text()
             assert "2A" in name, f"the configuration's name names the preset: {name}"
 
+            # Tapping a configuration's name on the board shows what it sets; Load is there too.
+            assert board.locator(".gp-save").inner_text() == "Save preset…"
+            board.locator(".gp-config-text", has_text=name).click()
+            board.wait_for_selector(".gp-sheet .gp-cfg-mod")
+            details = board.locator(".gp-sheet").inner_text()
+            assert "DS" in details and "AMP" in details and "GAIN" in details, f"the stored modules and values: {details}"
+            assert board.locator(".gp-sheet .gp-yes").inner_text() == "Load"
+            shot(board, "board-config")
+            board.locator(".gp-sheet .gp-no").click()
+            assert board.locator(".gp-apply").first.inner_text() == "Load"
+
             # The phone: ▶ selects 2B on the pedal; quick slot 1 recalls the configuration there.
             deck.locator(".gd-next").click()
             wait(lambda: board.evaluate("() => window.__pedal.state.current") == 6, 5, "the pedal to switch to 2B")

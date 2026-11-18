@@ -108,7 +108,7 @@
 .gp-config-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .gp-config { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 18px; border-radius: 16px;
   background: rgba(255, 255, 255, 0.04); border: 1px solid var(--felt-line); }
-.gp-config-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.gp-config-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
 .gp-config-text b { font-family: var(--display); font-size: 24px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gp-config-text span { font-size: 16px; }
 .gp-tags { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -143,3 +143,12 @@
 .gp-away { position: absolute; left: 44px; right: 680px; top: 430px; display: grid; place-items: center; }
 .gp-away-box { max-width: 900px; text-align: center; padding: 30px 46px; border-radius: 18px; background: rgba(6, 20, 15, 0.85);
   border: 1px solid rgba(214, 169, 74, 0.3); font-size: 24px; }
+
+/* A configuration's details (tap its name): each stored module with its model and values. */
+.gp-cfg-mods { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; overflow-y: auto; min-height: 0; }
+.gp-cfg-mod { padding: 12px 16px; border-radius: 14px; background: rgba(6, 20, 15, 0.6); border: 1px solid var(--felt-line); }
+.gp-cfg-mod-head { display: flex; align-items: baseline; gap: 14px; }
+.gp-cfg-mod-head b { font-size: 15px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--brass); }
+.gp-cfg-mod-head span { font-family: var(--display); font-size: 22px; }
+.gp-cfg-vals { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; font-size: 19px; }
+.gp-cfg-vals i { font-style: normal; font-size: 14px; letter-spacing: 0.14em; color: var(--ink-soft); margin-right: 4px; }

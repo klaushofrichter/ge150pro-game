@@ -21,7 +21,7 @@ play. The table only controls the pedal; the guitar plays through the pedal as a
 - **One player, at the table.** Choose **GE150 Pro** in the lobby, join with the QR code, mark ready, start.
 - **The board** connects to the pedal (or tap **Connect pedal**), loads its 200 presets and shows the signal chain:
   switch modules, choose models from a grid, move each parameter on a large fader, select presets by bank and A–D,
-  and **Save…** a sound to its preset slot (it asks first).
+  and **Save preset…** a sound to its preset slot (it asks first).
 - **Configurations**: **Save configuration…** on the board keeps chosen modules exactly as they are, for a **quick
   slot** on the phone (1–8) or for a **footswitch**: when the pedal's footswitch selects that preset, the board applies
   the configuration right after. The pedal's footswitch functions themselves are fixed in its firmware; this adds to
