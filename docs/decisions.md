@@ -217,3 +217,8 @@ Records are history: an older record is not edited when a newer one changes it. 
   before (a later `B0` reports the earlier preset's target). The board now sends the preset's own target and mode
   (`98`) after a selection when they differ. *Inferred* from the captures; the EXP volume range (`B3`) is not
   restored.
+  *2026-11-18 later (Claude):* on the table the board ran 2026.11.18.6 with the stylesheet of .5: the table loads
+  `board.js`/`deck.js` with `?v=<version>` but `useStyles` and `assetUrl` give plain paths, which Chrome served from
+  its cache. The game now adds its own `?v=…` (from `import.meta.url`) to its stylesheet and to `ge150.js`. Checked
+  on the pedal: selecting from the banks window sets the preset's own EXP target (no *), Reset and Reload saved go
+  back to the saved preset.
