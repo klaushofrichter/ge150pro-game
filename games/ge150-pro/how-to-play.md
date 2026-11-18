@@ -28,12 +28,13 @@ board says so and changes nothing on the pedal: update it with Mooer's editor.
 - **Connected** (top left): tap it to disconnect the pedal, after asking, so Mooer's editor or the web editor can use
   it. **Connect pedal** connects again; until then the board does not connect by itself.
 - **The preset's name** at the top (on the board and the phone): tap it to see what the preset plays, module by
-  module: on or off, the model (which amp, which cab) and its values. Nothing to change there.
+  module: on or off, the model (which amp, which cab) and its values. Unsaved changes are marked in brass beside the saved value, and
+  **Reset** goes back to the saved preset.
 - **The signal chain** across the top shows the nine modules in the pedal's order. **ON/OFF** switches a module; tap
   its name to edit it below.
 - **The editor** shows the module's model (tap it to choose another) and a fader for each parameter: drag anywhere on
   a fader, or use **−** and **+**.
-- Tap the **bank name** on the right to see every bank and its presets; tap one to show that bank.
+- Tap the **bank name** on the right to see every bank and its presets: the shown bank and the playing preset are marked, a * shows unsaved changes. Tap a preset to select it, or a bank's number to only show that bank. **Reload saved** (after asking) drops the unsaved changes.
 - **EXP** under a fader makes the expression pedal control that value in EXP mode (the toe switch selects EXP or
   volume mode). One value per preset: choosing another moves it there, and the chain shows an **EXP** badge on the
   module that has it. Faders without EXP are values the pedal cannot control. **Save preset…** keeps the choice.

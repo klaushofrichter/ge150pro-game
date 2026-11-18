@@ -153,10 +153,22 @@ def main():
             assert board.locator(".gp-sheet .gp-cfg-mod").count() == 9, "every module of the preset"
             info = board.locator(".gp-sheet").inner_text()
             assert "AMP" in info and "GAIN" in info and "CAB" in info, info
-            assert board.locator(".gp-sheet button").count() == 1, "nothing to change there: only Close"
+            # E-030: the unsaved DS switch and AMP fader marked with the saved values; Reset beside Close
+            assert board.locator(".gp-sheet .gp-cfg-mod.changed").count() == 2, board.locator(".gp-sheet .gp-cfg-mod.changed").count()
+            assert board.locator(".gp-sheet .gp-cfg-mod-head .chg").count() == 1 and board.locator(".gp-sheet .gp-cfg-vals .chg").count() >= 1
+            assert "saved" in board.locator(".gp-sheet .gp-cfg-vals .chg").first.inner_text()
+            assert board.locator(".gp-sheet button").count() == 2 and board.locator(".gp-sheet .gp-reset").is_visible(), "Close and Reset"
             assert board.locator(".gp-sheet .gp-cfg-mods.touch-scroll").count() == 1, "the wide scrollbar's list in the window"
             board.wait_for_timeout(300)
             shot(board, "board-preset-info")
+            board.locator(".gp-sheet .gp-no").click()
+            # Reset goes back to the saved preset; afterwards only Close
+            board.locator(".gp-now").click()
+            board.locator(".gp-sheet .gp-reset").click()
+            wait(lambda: not board.locator(".gp-name").inner_text().endswith("*"), 5, "Reset to drop the unsaved change")
+            wait(lambda: board.evaluate("() => window.__pedal.state.live[1].on") is False, 5, "DS off again, as saved")
+            board.locator(".gp-now").click()
+            assert board.locator(".gp-sheet button").count() == 1 and board.locator(".gp-sheet .chg").count() == 0, "nothing unsaved: only Close"
             board.locator(".gp-sheet .gp-no").click()
             deck.locator(".gd-now").click()
             wait(lambda: deck.locator(".gd-info-wrap").is_visible(), 5, "the phone's preset window")

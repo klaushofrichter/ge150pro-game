@@ -88,20 +88,46 @@ def main():
             assert board.locator(".gp-sheet-wrap").is_hidden(), "the model window closes after a choice"
             shot(board, "board-model")
 
-            # E-029: the bank name opens every bank; a preset there shows its bank and selects nothing on the pedal.
+            # E-029/E-030: the bank name opens every bank; a bank's number only shows it, a preset selects it.
             playing = board.evaluate("() => window.__pedal.state.current")
             selects = sent(board, 0x96)
             board.locator(".gp-bank-name").click()
             board.wait_for_selector(".gp-bk-row")
             assert board.locator(".gp-bk-row").count() == 50, board.locator(".gp-bk-row").count()
             assert board.locator(".gp-bk-row.sel").is_visible(), "the shown bank is in view"
+            assert board.locator(".gp-bk-preset.on").count() == 1 and int(board.locator(".gp-bk-preset.on").get_attribute("data-index")) == playing, "the playing preset marked"
             wait(lambda: board.locator(".gp-banks.touch-scroll.scrolls .scroll-bar").count() == 1, 5, "the wide scrollbar in the banks")
             shot(board, "board-banks")
-            board.locator(".gp-bk-row").nth(13).locator(".gp-bk-preset").nth(2).click()
+            board.locator(".gp-bk-row").nth(13).locator(".gp-bk-num").click()
             assert board.locator(".gp-sheet-wrap").is_hidden(), "the banks close after a choice"
             assert board.locator(".gp-bank-name").inner_text() == "Bank 14", board.locator(".gp-bank-name").inner_text()
             time.sleep(0.3)
-            assert sent(board, 0x96) == selects and board.evaluate("() => window.__pedal.state.current") == playing, "only shown, not selected"
+            assert sent(board, 0x96) == selects and board.evaluate("() => window.__pedal.state.current") == playing, "a bank number only shows the bank"
+            board.locator(".gp-bank-name").click()
+            assert board.locator(".gp-bk-row.sel .gp-bk-num").inner_text() == "14", "the shown bank marked"
+            board.locator(".gp-bk-row").nth(13).locator(".gp-bk-preset").nth(2).click()
+            wait(lambda: board.evaluate("() => window.__pedal.state.current") == 55, 5, "14C selected on the pedal")
+            # the pedal kept the old EXP target on a host selection: the board sets 14C's own, so 14C is not unsaved
+            wait(lambda: board.evaluate("() => window.__pedal.state.exp.slice(0, 3).join()") == "2,13,0", 5, "14C's own EXP target")
+            time.sleep(0.5)
+            assert not board.locator(".gp-name").inner_text().endswith("*"), board.locator(".gp-name").inner_text()
+            # an unsaved change: * in the banks; Reload saved asks, then drops it
+            board.locator(".gp-power[data-power='1']").click()
+            wait(lambda: board.locator(".gp-name").inner_text().endswith("*"), 5, "the unsaved mark")
+            board.locator(".gp-bank-name").click()
+            assert board.locator(".gp-bk-preset.on span").inner_text().endswith(" *"), board.locator(".gp-bk-preset.on span").inner_text()
+            board.wait_for_timeout(300)
+            shot(board, "board-banks-unsaved")
+            board.locator(".gp-reload").click()
+            board.wait_for_selector(".gp-sheet .gp-yes")
+            assert "lost" in board.locator(".gp-sheet").inner_text()
+            board.locator(".gp-sheet .gp-yes").click()
+            wait(lambda: not board.locator(".gp-name").inner_text().endswith("*"), 5, "the unsaved mark to go after Reload")
+            # back to the preset from before, through the banks (the rest of the flow expects it)
+            board.locator(".gp-bank-name").click()
+            board.locator(f".gp-bk-preset[data-index='{playing}']").click()
+            wait(lambda: board.evaluate("() => window.__pedal.state.current") == playing, 5, "the preset from before")
+            wait(lambda: board.evaluate("() => window.__pedal.state.exp.slice(0, 3).join()") == "8,57,1", 5, "its own EXP target again")
 
             # A configuration for the next game, on quick slot 1.
             board.locator(".gp-tab[data-tab=configs]").click()

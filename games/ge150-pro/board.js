@@ -512,6 +512,24 @@ export function mount(root, ctx) {
       adopt(before); // the pedal did not switch: show what it plays
       throw e;
     }
+    await restoreExp(index);
+  }
+
+  /**
+   * A selection from the host loads the modules but keeps the expression pedal's target and mode from before (seen in
+   * the USB captures: a footswitch loads the preset's own, `96` does not), so the new preset showed * at once. Set
+   * the preset's own, as its footswitch would (E-030).
+   */
+  async function restoreExp(index) {
+    const want = stored.get(index)?.exp;
+    if (!want || !exp || index !== current) return;
+    const keys = ["MODULE_CTRL", "PARA_CTRL", "FUN_SWITCH"];
+    if (keys.every((k) => exp[k] === want[k])) return;
+    const e = Object.fromEntries(keys.map((k) => [k, want[k]]));
+    await dev?.setExpFunction(e);
+    exp = { ...exp, ...e };
+    afterLiveChange();
+    if (e.FUN_SWITCH === 1) await peekLive(); // in EXP mode the pedal may set the target from where it stands
   }
 
   async function applyConfig(c, fromSwitch) {
@@ -795,26 +813,35 @@ export function mount(root, ctx) {
     touchScroll(list); // (measures again after the scroll)
   }
 
-  /** Every bank with its four presets; tapping one shows that bank on the right (E-029). Selects nothing on the pedal. */
+  /**
+   * Every bank with its four presets (E-029, E-030): the bank shown on the right and the preset that plays are marked,
+   * the playing one with * for unsaved changes. A preset selects it on the pedal (asking about unsaved changes, as the
+   * A-D buttons do); a bank's number only shows that bank. Reload saved discards the unsaved changes.
+   */
   function openBanks() {
     if (!lib) return;
     const local = plays();
     const names = local && ready ? null : view.pedal.names;
     const nameOf = (i) => (names ? names[i - 1] : stored.get(i)?.name.trim()) || "";
     const playing = local ? current || view.pedal.current : view.pedal.current;
+    const unsaved = local ? modifiedNow() : !!view.pedal.modified;
     const rows = Array.from({ length: banks() }, (_, b) => {
       const cells = [0, 1, 2, 3].map((k) => {
         const i = b * 4 + k + 1;
-        return `<button type="button" class="gp-bk-preset ${i === playing ? "on" : ""}" data-bank="${b + 1}"><b>${"ABCD"[k]}</b><span>${esc(nameOf(i) || "—")}</span></button>`;
+        const on = i === playing;
+        return `<button type="button" class="gp-bk-preset ${on ? "on" : ""}" data-bank="${b + 1}" data-index="${i}"${on ? ' aria-current="true"' : ""}><b>${"ABCD"[k]}</b><span>${esc(nameOf(i) || "—")}${on && unsaved ? " *" : ""}</span></button>`;
       }).join("");
-      return `<div class="gp-bk-row ${b + 1 === bank ? "sel" : ""}"><button type="button" class="gp-bk-num" data-bank="${b + 1}">${b + 1}</button>${cells}</div>`;
+      const shown = b + 1 === bank;
+      return `<div class="gp-bk-row ${shown ? "sel" : ""}"><button type="button" class="gp-bk-num" data-bank="${b + 1}" aria-label="Show bank ${b + 1}${shown ? " (shown)" : ""}">${b + 1}</button>${cells}</div>`;
     }).join("");
     openSheet(
       `<div class="gp-sheet-head"><div class="gp-sheet-title">Banks</div>
-        <button type="button" class="gp-btn gp-close">Close</button></div>
+        <div class="gp-sheet-head-btns"><button type="button" class="gp-btn gp-reload" ${canSwitch() ? "" : "disabled"}>Reload saved</button>
+        <button type="button" class="gp-btn gp-close">Close</button></div></div>
       <div class="gp-banks gp-scroll">${rows}</div>`,
       (el) => {
         el.querySelector(".gp-close").onclick = closeSheet;
+        el.querySelector(".gp-reload").onclick = askReload;
         scrollTo(el.querySelector(".gp-banks"), el.querySelector(".gp-bk-row.sel"));
         el.querySelector(".gp-banks").onclick = (e) => {
           const b = e.target.closest("[data-bank]");
@@ -822,8 +849,24 @@ export function mount(root, ctx) {
           bank = Number(b.dataset.bank);
           closeSheet();
           draw();
+          const i = Number(b.dataset.index);
+          if (i && canSwitch()) switchFromBoard(i, () => select(i));
         };
       },
+    );
+  }
+
+  /** Back to the saved presets (E-030): the pedal selects the playing preset again, which drops its unsaved changes. */
+  function askReload() {
+    if (!canSwitch()) return;
+    const label = lib.presetLabel(current);
+    ask(
+      "Reload the saved presets?",
+      modifiedNow()
+        ? `${label} plays with unsaved changes. Reloading selects it again from the pedal's memory, so these changes are lost. The other presets have none: the pedal keeps unsaved changes only for the preset that plays.`
+        : `No preset has unsaved changes. Reloading selects ${label} again from the pedal's memory, its expression pedal setting included.`,
+      "Reload",
+      () => later(() => select(current)),
     );
   }
 
@@ -920,24 +963,49 @@ export function mount(root, ctx) {
   /** The current preset as the pedal plays it: every module with its switch, model and values; nothing to change (E-024). */
   function openPresetInfo() {
     if (!lib || !modules || !current) return;
-    const name = stored.get(current)?.name?.trim() || lib.presetLabel(current);
+    const base = stored.get(current);
+    const name = base?.name?.trim() || lib.presetLabel(current);
+    const unsaved = modifiedNow();
+    // unsaved changes marked against the stored preset (E-030): what Save keeps, without the pedal's position
+    const live = unsaved ? kept() : modules;
+    const expNote = unsaved && expChanged() ? `<p class="gp-sheet-text gp-chg-note">The expression pedal controls ${esc(lib.expLabel(exp))}; saved: ${esc(lib.expLabel(base.exp))}.</p>` : "";
     openSheet(
-      `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(lib.presetLabel(current))} · ${esc(name)}${modifiedNow() ? " *" : ""}</div></div>
-      <div class="gp-cfg-mods gp-scroll">${modulesHtml(modules.map((m, s) => [s, m]))}</div>
-      <p class="gp-sheet-text muted">As the pedal plays it now${modifiedNow() ? ", with unsaved changes (*)" : ""}. Change modules in the signal chain above, or in the GE150 Pro Editor web app.</p>
-      <div class="gp-sheet-btns"><button type="button" class="gp-btn primary gp-no">Close</button></div>`,
-      (el) => (el.querySelector(".gp-no").onclick = closeSheet),
+      `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(lib.presetLabel(current))} · ${esc(name)}${unsaved ? " *" : ""}</div></div>
+      <div class="gp-cfg-mods gp-scroll">${modulesHtml(live.map((m, s) => [s, m]), unsaved ? base.modules : null)}</div>${expNote}
+      <p class="gp-sheet-text muted">As the pedal plays it now${unsaved ? ", with the unsaved changes (*) in brass next to the saved value. Reset goes back to the saved preset" : ""}. Change modules in the signal chain above, or in the GE150 Pro Editor web app.</p>
+      <div class="gp-sheet-btns">${unsaved ? `<button type="button" class="gp-btn gp-reset" ${canSwitch() ? "" : "disabled"}>Reset</button>` : ""}<button type="button" class="gp-btn primary gp-no">Close</button></div>`,
+      (el) => {
+        el.querySelector(".gp-no").onclick = closeSheet;
+        const r = el.querySelector(".gp-reset");
+        if (r) r.onclick = () => (closeSheet(), canSwitch() && later(() => select(current)));
+      },
     );
   }
 
-  /** Module cards for a sheet: [slot, {on, type, values}] → name, switch, model and (when on) its values. */
-  function modulesHtml(entries) {
+  /**
+   * Module cards for a sheet: [slot, {on, type, values}] → name, switch, model and (when on) its values. With `saved`
+   * (the stored modules), what differs from it is marked, with the saved value.
+   */
+  function modulesHtml(entries, saved = null) {
     return entries
       .map(([s, m]) => {
         const mm = lib.model(s, m.type);
-        const vals = m.on && mm ? mm.params.map((p) => `<span><i>${esc(p.name)}</i> ${esc(lib.formatValue(p, m.values[p.pos]))}</span>`).join("") : "";
-        return `<div class="gp-cfg-mod ${m.on ? "" : "off"}"><div class="gp-cfg-mod-head"><b>${esc(lib.catalog.slots[s].name)}</b>
-          <span>${m.on ? "On" : "Off"}${mm ? ` · ${esc(mm.name)}` : ""}</span></div>${vals ? `<div class="gp-cfg-vals">${vals}</div>` : ""}</div>`;
+        const was = saved?.[s];
+        const sameModel = !was || was.type === m.type;
+        const vals = m.on && mm
+          ? mm.params.map((p) => {
+              const chg = was && sameModel && was.values[p.pos] !== m.values[p.pos];
+              return `<span class="${chg ? "chg" : ""}"><i>${esc(p.name)}</i> ${esc(lib.formatValue(p, m.values[p.pos]))}${chg ? ` <small>saved ${esc(lib.formatValue(p, was.values[p.pos]))}</small>` : ""}</span>`;
+            }).join("")
+          : "";
+        const onOff = m.on ? "On" : "Off";
+        const head = [
+          was && was.on !== m.on ? `<em class="chg">${onOff}</em> <small>saved ${was.on ? "on" : "off"}</small>` : onOff,
+          ...(mm ? [sameModel ? esc(mm.name) : `<em class="chg">${esc(mm.name)}</em> <small>saved ${esc(lib.model(s, was.type)?.name ?? "")}</small>`] : []),
+        ].join(" · ");
+        const changed = was && !sameModule(m, was);
+        return `<div class="gp-cfg-mod ${m.on ? "" : "off"} ${changed ? "changed" : ""}"><div class="gp-cfg-mod-head"><b>${esc(lib.catalog.slots[s].name)}</b>
+          <span>${head}</span></div>${vals ? `<div class="gp-cfg-vals">${vals}</div>` : ""}</div>`;
       })
       .join("");
   }
