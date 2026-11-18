@@ -25,6 +25,8 @@ board says so and changes nothing on the pedal: update it with Mooer's editor.
 
 ## The board
 
+- **Connected** (top left): tap it to disconnect the pedal, after asking, so Mooer's editor or the web editor can use
+  it. **Connect pedal** connects again; until then the board does not connect by itself.
 - **The preset's name** at the top (on the board and the phone): tap it to see what the preset plays, module by
   module: on or off, the model (which amp, which cab) and its values. Nothing to change there.
 - **The signal chain** across the top shows the nine modules in the pedal's order. **ON/OFF** switches a module; tap

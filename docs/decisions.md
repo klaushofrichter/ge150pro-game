@@ -169,3 +169,11 @@ Records are history: an older record is not edited when a newer one changes it. 
   chain or the web editor). The board's preset name sits in the middle of the bar. *Implementation (Claude):* the
   board's chain report carries each module's raw values (`chain[].values`, checked by the rules; a malformed list is
   dropped), so the phone can show them; the phone's dialogs get a solid background (they were see-through).
+- **E-025 · 2026-11-17 · Klaus** — Tapping **Connected** on the board offers to disconnect the pedal (with a
+  confirmation that mentions unsaved changes), so another program can use it. The board then shows *Disconnected*
+  with Connect pedal, and does not connect again by itself (updates and hotplugs leave it alone) until Connect pedal
+  or the settings' *Connect the pedal again* is tapped. The phone shows the state; it has no disconnect of its own.
+- **E-026 · 2026-11-17 · Klaus** — Connect pedal in fullscreen: Chrome's device chooser ends fullscreen; once a pedal
+  is chosen (or the chooser is closed) the board asks for fullscreen again, on the same page the table's Fullscreen
+  uses. If the browser no longer allows it without a touch, the next touch anywhere brings it back. Not covered by
+  the browser checks (their pedal has no chooser); to be tried on the table.

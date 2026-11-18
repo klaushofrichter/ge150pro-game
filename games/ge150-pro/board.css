@@ -19,6 +19,9 @@
 /* the preset's name in the middle of the screen, the connection left and Save preset… right of it */
 .gp-bar-right { justify-self: end; }
 .gp-conn { display: flex; align-items: center; gap: 14px; min-width: 0; }
+/* Connected: tap to disconnect (E-025) */
+.gp-conn.can-release .gp-conn-text, .gp-conn.can-release .gp-dot { cursor: pointer; }
+.gp-conn.can-release .gp-conn-text { text-decoration: underline dotted rgba(255, 255, 255, 0.3); text-underline-offset: 5px; }
 .gp-conn-text { font-size: 19px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gp-dot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--ink-faint); box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35); }
 .gp-dot[data-state="on"] { background: var(--jade); box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), 0 0 12px var(--jade); }
