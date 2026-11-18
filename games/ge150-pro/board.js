@@ -25,7 +25,7 @@ const STATES = {
   loading: { title: "Connecting…", text: "Loading the presets…" },
   connected: { title: "Connected", text: "" },
   unplugged: { title: "Pedal disconnected", text: "Plug it in again.", retry: true },
-  released: { title: "Disconnected", text: "The table let go of the pedal: Mooer's editor or the web editor can use it now. Tap Connect pedal to connect again.", retry: true },
+  released: { title: "Disconnected", text: "The table let go of the pedal: Mooer's editor or the web editor (klaushofrichter.github.io/ge150pro-editor) can use it now. Tap Connect pedal to connect again.", retry: true },
   unsupported: { title: "Firmware not supported",
     text: `The game needs firmware ${MIN_FIRMWARE} or newer. Update the pedal with Mooer's editor; the game changes nothing on this pedal.` },
   error: { title: "Pedal error", text: "" },
@@ -72,7 +72,7 @@ export function mount(root, ctx) {
       <section class="gp-editor">
         <div class="gp-ed-head"><div><div class="gp-ed-slot"></div><button class="gp-btn gp-model" type="button"></button></div>
           <button class="gp-power gp-ed-power" type="button" aria-label="Switch the module on or off"></button></div>
-        <div class="gp-exp-note muted" hidden>The pedal is in volume mode: EXP sets the volume until its toe switch selects EXP mode.</div>
+        <div class="gp-exp-note muted" hidden>The pedal is in volume mode: it sets the volume. Tap the outlined EXP (or the toe switch) for EXP mode.</div>
         <div class="gp-faders"></div>
         <div class="gp-notice" hidden><div class="gp-notice-title"></div><div class="gp-notice-text"></div>
           <button class="gp-btn primary gp-notice-connect" type="button" hidden>Connect pedal</button>
@@ -80,7 +80,8 @@ export function mount(root, ctx) {
             <div class="gp-req-row"><b>Device</b><span>Mooer GE150 Pro, connected to this table by USB</span></div>
             <div class="gp-req-row"><b>Firmware</b><span class="gp-req-fw">${MIN_FIRMWARE} or newer</span></div>
             <div class="gp-req-note muted">The pedal does not tell its firmware version over USB, so the board checks how it
-              answers. Update an older pedal with Mooer's GE150 Pro editor.</div></div></div>
+              answers. Update an older pedal with Mooer's GE150 Pro editor.</div>
+            <div class="gp-req-row"><b>EXP pedal</b><span>Calibrate it first to use its full range: on the pedal, EXP → CALIBRATE</span></div></div></div>
       </section>
       <section class="gp-side">
         <div class="gp-tabs" role="tablist"><button class="gp-tab on" type="button" data-tab="presets">Presets</button>
@@ -336,7 +337,7 @@ export function mount(root, ctx) {
       stored.set(p.index, p);
       if (p.index === current && !modules) adopt(current);
     });
-    d.on("current", (i) => adopt(i));
+    d.on("current", (i) => (peeking && i === current ? undefined : adopt(i)));
     d.on("switched", (i) => onSwitched(i));
     d.on("module", (slot, m) => {
       if (!modules) return;
@@ -395,29 +396,47 @@ export function mount(root, ctx) {
   /** The EXP target of this board's pedal (null on a remote board, which has only the phone's label). */
   const expOf = () => (plays() && exp?.MODULE_CTRL !== undefined ? exp : null);
 
+  /** The pedal is in EXP mode now (its toe switch's mode): it moves its target, not the volume. */
+  const expMode = () => exp?.FUN_SWITCH === 1;
+
   /**
-   * The expression pedal controls this slider of the open module from now on, in EXP mode (E-027). One target per
-   * preset: it moves here from wherever it was, without asking; an unsaved change until Save preset….
+   * The EXP toggle under a slider (E-027, E-028). On another slider: the expression pedal controls this one from now
+   * on, in the mode it is in (one target per preset, moved without asking; an unsaved change until Save preset…). On
+   * the slider it already controls: the toe switch's mode, EXP ⇄ volume, as the pedal's own toe switch does.
    */
   function assignExp(i) {
     if (!canEdit() || !exp) return;
     const p = lib.model(selected, modules[selected].type)?.params[i];
     const id = p && lib.expParamId(selected, p.name);
-    if (id === undefined || (exp.MODULE_CTRL === selected && exp.PARA_CTRL === id)) return;
-    exp = { ...exp, MODULE_CTRL: selected, PARA_CTRL: id };
-    const e = { MODULE_CTRL: exp.MODULE_CTRL, PARA_CTRL: exp.PARA_CTRL, FUN_SWITCH: exp.FUN_SWITCH ?? 1 };
+    if (id === undefined) return;
+    const toggle = exp.MODULE_CTRL === selected && exp.PARA_CTRL === id;
+    exp = { ...exp, MODULE_CTRL: selected, PARA_CTRL: id, FUN_SWITCH: toggle ? (expMode() ? 0 : 1) : exp.FUN_SWITCH ?? 1 };
+    const e = { MODULE_CTRL: exp.MODULE_CTRL, PARA_CTRL: exp.PARA_CTRL, FUN_SWITCH: exp.FUN_SWITCH };
     afterLiveChange();
     later(async () => {
       try {
         await dev?.setExpFunction(e);
       } catch {
-        return notice("the EXP target did not reach the pedal");
+        return notice("the EXP setting did not reach the pedal");
       }
       // a read of the live state still running when the toggle was tapped (after a switch) put back the stored
       // target: the pedal has this one now, so show it again
-      exp = { ...exp, MODULE_CTRL: e.MODULE_CTRL, PARA_CTRL: e.PARA_CTRL };
+      exp = { ...exp, ...e };
       afterLiveChange();
+      // into EXP mode: the pedal sets the value from where it stands; read it so the slider shows it
+      if (e.FUN_SWITCH === 1) await peekLive();
     });
+  }
+
+  /** Read the pedal's live values without taking the preset again from the stored copy (adopt): unsaved edits stay. */
+  let peeking = false;
+  async function peekLive() {
+    peeking = true;
+    try {
+      await dev?.readCurrent();
+    } finally {
+      peeking = false;
+    }
   }
 
   function afterLiveChange() {
@@ -600,7 +619,7 @@ export function mount(root, ctx) {
       const modelName = m && lib ? lib.model(s, m.type)?.name ?? `model ${m.type + 1}` : "";
       const expHere = expOf()?.MODULE_CTRL === s;
       return `<div class="gp-tile ${m?.on ? "on" : ""} ${s === selected ? "sel" : ""}" role="listitem" data-slot="${s}">
-        ${expHere ? `<span class="gp-exp-badge" title="The expression pedal controls ${esc(lib.expLabel(expOf()))} in EXP mode">EXP</span>` : ""}
+        ${expHere ? `<span class="gp-exp-badge ${expMode() ? "" : "vol"}" title="The expression pedal controls ${esc(lib.expLabel(expOf()))} in EXP mode${expMode() ? "" : "; it is in volume mode now"}">EXP</span>` : ""}
         <button class="gp-tile-body" type="button" data-slot="${s}"><span class="gp-tile-slot">${esc(slotName)}</span>
           <span class="gp-tile-model">${esc(modelName)}</span></button>
         <button class="gp-power" type="button" data-power="${s}" aria-label="${esc(slotName)} on or off" aria-pressed="${!!m?.on}" ${canEdit() ? "" : "disabled"}></button></div>`;
@@ -654,8 +673,10 @@ export function mount(root, ctx) {
       if (xb) {
         const on = !!exp && exp.MODULE_CTRL === selected && exp.PARA_CTRL === lib.expParamId(selected, p.name);
         xb.setAttribute("aria-pressed", String(on));
-        // the target can only move, not go: the pedal always controls something in EXP mode
-        xb.disabled = !canEdit() || on || !exp;
+        // the target: filled in EXP mode, only outlined in volume mode; tapping it again switches the mode
+        xb.classList.toggle("vol", on && !expMode());
+        xb.setAttribute("aria-label", on ? `EXP controls ${p.name}: ${expMode() ? "EXP mode, tap for volume mode" : "volume mode, tap for EXP mode"}` : `Expression pedal controls ${p.name}`);
+        xb.disabled = !canEdit() || !exp;
       }
     });
     $(".gp-exp-note").hidden = !exp || exp.FUN_SWITCH === 1;
