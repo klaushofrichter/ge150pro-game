@@ -106,10 +106,8 @@ def main():
             time.sleep(1.0)
             assert sent(board, 0x96) == 0, "a reload repeats a command already carried out"
 
-            # Finish; the next game brings the phone's configurations back.
-            deck.locator(".gd-tab[data-tab=setup]").click()
-            deck.locator(".gd-finish").click()
-            deck.locator(".gd-end").click()
+            # End the game (the platform's way); the next game brings the configurations back.
+            a("POST", "/game/end")
             wait(lambda: a("GET", "/state")["phase"] != "active", 10, "the game to end")
             a("POST", "/game/close", {})
             wait(lambda: a("GET", "/state")["phase"] == "idle", 10, "the lobby")

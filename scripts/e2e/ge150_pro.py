@@ -90,7 +90,9 @@ def main():
             wait(lambda: not board.locator(".gp-root.gp-north").count(), 5, "the board to turn back south")
             check(deck, "phone Play")
             tabs = deck.locator(".gd-tabs").bounding_box()
-            assert tabs and tabs["y"] + tabs["height"] <= 568 + 1, f"the game's tabs are on screen: {tabs}"
+            card = deck.locator(".gd-now").bounding_box()
+            assert tabs and card and tabs["y"] + tabs["height"] <= card["y"], f"the game's tabs sit above the preset card: {tabs} {card}"
+            assert deck.locator(".gd-tab[data-tab=play]").inner_text() == "Preset"
             shot(deck, "phone-play")
 
             # Edit on the board: DS on/off, then a fader of the open module (AMP).
@@ -174,20 +176,15 @@ def main():
             shot(deck, "phone-rhythm")
             deck.locator(".gd-start").click()
 
-            # The Pedal tab, then Finish: it asks first.
+            # The Pedal tab: the preset card stays, no Finish (the game is left through the platform's player tab).
             deck.locator(".gd-tab[data-tab=setup]").click()
             tabs_on = deck.evaluate("() => [...document.querySelectorAll('.gd-tab.on')].map((b) => b.dataset.tab)")
             assert tabs_on == ["setup"], f"the Pedal tab is the one marked: {tabs_on}"
-            tabs = deck.locator(".gd-tabs").bounding_box()
-            assert tabs["y"] + tabs["height"] > 568 - 90, f"the tabs sit at the bottom on a short page: {tabs}"
+            assert deck.locator(".gd-now").is_visible(), "the preset card shows on every tab"
+            assert deck.locator("button", has_text="Finish").count() == 0, "no Finish on the phone"
             check(deck, "phone Pedal")
             shot(deck, "phone-pedal")
-            deck.locator(".gd-finish").click()
-            assert deck.locator(".gd-confirm").is_visible(), "Finish asks first"
-            deck.locator(".gd-keep").click()
-            assert deck.locator(".gd-finish").is_visible()
-            deck.locator(".gd-finish").click()
-            deck.locator(".gd-end").click()
+            a("POST", "/game/end")
             wait(lambda: a("GET", "/state")["phase"] != "active", 10, "the game to end")
             shot(board, "board-end")
 

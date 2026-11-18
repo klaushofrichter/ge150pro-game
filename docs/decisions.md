@@ -136,3 +136,8 @@ Records are history: an older record is not edited when a newer one changes it. 
   places at the top of the screen, turned in place, instead of moving to the bottom edge with the rest of the board,
   where they overlapped the platform's Lobby, settings and rotate buttons. The preset name stays in the bar (at the
   bottom between those buttons). The browser check turns the board north and checks both stay at the top.
+- **E-020 · 2026-11-17 · Klaus** — The phone's game tabs move from the bottom to the top, right under the platform's
+  player and game tabs; the current preset's card follows on every tab, then the tab's page (pages should still fit
+  without scrolling). **Play** is renamed **Preset**, which is what it selects. **Finish** leaves the Pedal tab: the
+  game is left through the platform's player tab (the rules still accept `finish`). With no quick slot filled, the
+  Preset tab says what the eight slots are for (Save configuration… on the board).

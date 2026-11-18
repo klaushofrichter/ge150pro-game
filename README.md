@@ -16,7 +16,7 @@ play. The table only controls the pedal; the guitar plays through the pedal as a
 
 ![The board: the signal chain across the top, the AMP module's faders, and the presets of bank 2](docs/media/board.png)
 
-<img src="docs/media/phone-play.png" width="240" align="right" alt="The phone's Play tab: the current preset, ◀ ▶ and eight quick slots">
+<img src="docs/media/phone-play.png" width="240" align="right" alt="The phone's Preset tab: the current preset, ◀ ▶ and eight quick slots">
 
 - **One player, at the table.** Choose **GE150 Pro** in the lobby, join with the QR code, mark ready, start.
 - **The board** connects to the pedal (or tap **Connect pedal**), loads its 200 presets and shows the signal chain:
@@ -26,9 +26,10 @@ play. The table only controls the pedal; the guitar plays through the pedal as a
   slot** on the phone (1–8) or for a **footswitch**: when the pedal's footswitch selects that preset, the board applies
   the configuration right after. The pedal's footswitch functions themselves are fixed in its firmware; this adds to
   them without changing the pedal.
-- **The phone** has its own tabs: **Play** (current preset, ◀ ▶, quick slots, the expression pedal's target),
+- **The phone** has its own tabs at the top, above the current preset's card: **Preset** (◀ ▶, quick slots, the
+  expression pedal's target),
   **Rhythm** (the pedal's drum machine by name and tempo, and a **table click** with tap tempo that can follow the
-  drum machine) and **Pedal** (connection, configurations: rename, delete; **Finish**). The table keeps the
+  drum machine) and **Pedal** (connection, configurations: rename, delete). The game is left through the platform's player tab. The table keeps the
   configurations between games (its game data: *Advanced › Game data* on the board exports, imports and deletes them).
 - **Rhythm** on the pedal itself is started and stopped on the pedal: its firmware takes no rhythm commands over USB
   (nor MIDI start/stop or clock). The table click is the table's own, from its speakers.

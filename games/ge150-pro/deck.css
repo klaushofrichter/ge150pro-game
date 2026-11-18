@@ -1,13 +1,9 @@
-/* GE150 Pro on the phone: 360 px wide, short screens, one hand. The game's tabs sit at the bottom, in thumb reach. */
-/* The game's area (#body, the platform's) grows to fill the phone while this game is shown, so the tabs sit at the
-   bottom on a short page too; on a long page they stick to the bottom of the screen. */
-#body:has(> .gd) { flex: 1; }
-.gd { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 8px; }
-.gd-pages { flex: 1; min-height: 0; }
+/* GE150 Pro on the phone: 360 px wide, short screens, one hand. The game's tabs sit at the top, under the platform's
+   tabs; then the current preset's card, then the tab's page (which should fit without scrolling, E-020). */
+.gd { display: flex; flex-direction: column; gap: 8px; }
 .gd-page { display: flex; flex-direction: column; gap: 10px; }
 .gd button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
-.gd-tabs { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
-  padding: 6px 0 4px; background: var(--felt, #0b1f1b); }
+.gd-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .gd-tab { min-height: 48px; transition: none; } /* instant: the platform's fade left two tabs half-lit */
 .gd-tab:hover { border-color: var(--felt-line, rgba(255, 255, 255, 0.12)); }
 .gd-tab.on, .gd-tab.on:hover { background: var(--brass); color: #1b1407; border-color: var(--brass); }
@@ -54,8 +50,3 @@
 .gd-rename, .gd-delete { min-height: 44px; flex: none; }
 .gd-delete { width: 48px; padding: 0; }
 .gd-empty { font-size: 0.9em; padding: 6px 2px; }
-.gd-finish { min-height: 52px; }
-.gd-confirm { display: flex; flex-direction: column; gap: 8px; }
-.gd-confirm-text { font-size: 0.9em; color: var(--ink-soft); }
-.gd-confirm-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.gd-confirm-btns button { min-height: 52px; }

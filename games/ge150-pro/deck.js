@@ -1,6 +1,8 @@
-// GE150 Pro on the player's phone: a hands-free remote while playing. Play: the current preset, stepping presets, and
-// eight quick slots that recall configurations. Rhythm: the pedal's drum machine (shown; it is started on the pedal)
-// and the table's click track (started here). Pedal: the connection, the configurations, Finish. The configurations
+// GE150 Pro on the player's phone: a hands-free remote while playing. The game's tabs sit at the top, under the
+// platform's, then the current preset's card on every tab, then the tab. Preset: stepping presets, and eight quick
+// slots that recall configurations. Rhythm: the pedal's drum machine (shown; it is started on the pedal) and the table's
+// click track (started here). Pedal: the connection and the configurations. The game is left through the platform's
+// player tab (no Finish here, E-020). The configurations
 // are the table's, kept in its game data and brought to the game by the board (E-017); ones this phone kept before
 // that move to the table once. On a table without game data (an older platform) they live in this phone's browser
 // between games: sent to the game once, kept up to date from it (E-006).
@@ -44,12 +46,18 @@ function store(configs) {
 export function mount(root, ctx) {
   useStyles(`/games/${ID}/deck.css`);
   root.innerHTML = `<div class="gd">
+    <nav class="gd-tabs" role="tablist">
+      <button type="button" class="gd-tab on" data-tab="play" role="tab">Preset</button>
+      <button type="button" class="gd-tab" data-tab="rhythm" role="tab">Rhythm</button>
+      <button type="button" class="gd-tab" data-tab="setup" role="tab">Pedal</button>
+    </nav>
+    <div class="card gd-now"><div class="eyebrow gd-label"></div><div class="gd-name"></div><div class="gd-conn muted"></div></div>
     <div class="gd-pages">
       <section class="gd-page gd-play" data-page="play">
-        <div class="card gd-now"><div class="eyebrow gd-label"></div><div class="gd-name"></div><div class="gd-conn muted"></div></div>
         <div class="gd-step"><button type="button" class="gd-prev" aria-label="Previous preset">◀</button>
           <button type="button" class="gd-next" aria-label="Next preset">▶</button></div>
         <div class="gd-slots"></div>
+        <div class="gd-note muted gd-slots-note" hidden>Quick slots: on the board, Save configuration… puts a sound on a slot. Tap a slot while you play to recall it.</div>
         <div class="gd-exp muted"></div>
       </section>
       <section class="gd-page gd-rhythm" data-page="rhythm" hidden>
@@ -69,16 +77,8 @@ export function mount(root, ctx) {
         <div class="card gd-status"><div class="eyebrow">Pedal</div><div class="gd-status-text"></div>
           <div class="gd-req muted">Requires a Mooer GE150 Pro with firmware V2.1.2 or newer, connected to the table by USB.</div></div>
         <div class="gd-list"></div>
-        <button type="button" class="gd-finish">Finish</button>
-        <div class="gd-confirm" hidden><div class="gd-confirm-text">End the session? The pedal keeps its sound; the board offers Play again.</div>
-          <div class="gd-confirm-btns"><button type="button" class="primary gd-keep">Keep playing</button><button type="button" class="gd-end">Finish</button></div></div>
       </section>
     </div>
-    <nav class="gd-tabs" role="tablist">
-      <button type="button" class="gd-tab on" data-tab="play" role="tab">Play</button>
-      <button type="button" class="gd-tab" data-tab="rhythm" role="tab">Rhythm</button>
-      <button type="button" class="gd-tab" data-tab="setup" role="tab">Pedal</button>
-    </nav>
   </div>`;
   const $ = (s) => root.querySelector(s);
   let view = null, lib = null, sent = false, taps = [], beatTimer = null, beatKey = "";
@@ -117,6 +117,7 @@ export function mount(root, ctx) {
         <span>${q + 1}</span><b>${c ? esc(c.name) : "—"}</b></button>`;
     }).join("");
     setHtml($(".gd-slots"), slots);
+    $(".gd-slots-note").hidden = view.configs.some((x) => x.slot !== undefined && x.slot !== null && x.slot < view.quickSlots);
     $(".gd-exp").textContent = p.exp ? `EXP: ${p.exp.label}${p.exp.value ? ` · ${p.exp.value}` : ""}` : "";
     // Rhythm: the pedal's
     const r = p.rhythm;
@@ -144,7 +145,6 @@ export function mount(root, ctx) {
         <button type="button" class="gd-delete" data-id="${esc(x.id)}" aria-label="Delete ${esc(x.name)}" ${view.done ? "disabled" : ""}>✕</button></div>`;
     }).join("") || `<div class="muted gd-empty">No configurations yet: save one on the board.</div>`;
     setHtml($(".gd-list"), rows);
-    $(".gd-finish").disabled = view.done;
   }
 
   /** The beat light at the pedal's tempo while its drum machine plays (its beat, not its bar: the pedal sends no beat). */
@@ -207,18 +207,6 @@ export function mount(root, ctx) {
     const d = e.target.closest(".gd-delete");
     if (d) send("edit", { id: d.dataset.id, remove: true });
   });
-  // Finish ends the game for good (the platform has no way back into it), so it asks first.
-  const confirming = (on) => {
-    $(".gd-finish").hidden = on;
-    $(".gd-confirm").hidden = !on;
-  };
-  $(".gd-finish").addEventListener("click", () => confirming(true));
-  $(".gd-keep").addEventListener("click", () => confirming(false));
-  $(".gd-end").addEventListener("click", () => {
-    confirming(false);
-    ctx.send("finish", {});
-  });
-
   return {
     update(v) {
       view = v;
@@ -241,7 +229,6 @@ export function mount(root, ctx) {
         sent = false; // (sent again if the seat changes hands)
         store(v.configs);
       }
-      if (v.done) confirming(false);
       draw();
     },
     destroy() {
