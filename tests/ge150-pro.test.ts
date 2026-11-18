@@ -113,6 +113,16 @@ describe("GE150 Pro", () => {
     expect((rt.boardView() as any).configs).toEqual([]);
   });
 
+  it("keeps the modules' values the board reports with the chain, and drops malformed ones (E-024)", () => {
+    const { rt } = connected();
+    const values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const withValues = chain.map((m, s) => (s === 2 ? { ...m, values } : s === 3 ? { ...m, values: [1, 2] } : m));
+    expect(rt.submit(0, { name: "pedal", payload: { chain: withValues } }, "board")).toEqual({ ok: true });
+    const got = (rt.boardView() as any).pedal.chain;
+    expect(got[2].values).toEqual(values);
+    expect(got[3].values).toBeUndefined();
+  });
+
   it("wraps around the 200 presets", () => {
     const { rt } = connected();
     rt.submit(0, { name: "select", payload: { index: 200 } }, "human");

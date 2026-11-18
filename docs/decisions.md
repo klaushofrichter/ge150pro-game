@@ -164,3 +164,8 @@ Records are history: an older record is not edited when a newer one changes it. 
   board's sheet container, so the next sheet's confirm button (Save preset…, a configuration's details) also saved
   the configuration again; every sheet now starts without it. The browser check covers it (a file save after a
   capture would add a third configuration).
+- **E-024 · 2026-11-17 · Klaus** — Tapping the preset's name (the board's top row, the phone's preset card) opens what
+  the preset plays now: every module with its switch, model and values, read only (editing stays in the board's
+  chain or the web editor). The board's preset name sits in the middle of the bar. *Implementation (Claude):* the
+  board's chain report carries each module's raw values (`chain[].values`, checked by the rules; a malformed list is
+  dropped), so the phone can show them; the phone's dialogs get a solid background (they were see-through).

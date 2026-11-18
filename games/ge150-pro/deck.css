@@ -54,8 +54,18 @@
 /* The "save before switching?" question (E-021): over the page, the buttons stacked for one thumb. */
 .gd-ask-wrap { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
   padding: 16px; background: rgba(0, 0, 0, 0.6); }
-.gd-ask { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; }
+.gd-ask { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; background: var(--felt, #0b1f1b); }
 .gd-ask-title { font-family: var(--display); font-size: 1.4em; }
 .gd-ask-text { font-size: 0.9em; }
 .gd-ask-btns { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .gd-ask-btns button { min-height: 52px; }
+
+/* What the current preset plays (tap the preset card, E-024): read only, scrolls when long. */
+.gd-now { cursor: pointer; }
+.gd-info { max-height: calc(100dvh - 32px); }
+.gd-info-mods { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 0; }
+.gd-info-mod { padding: 6px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); font-size: 0.9em; }
+.gd-info-mod b { color: var(--brass); font-size: 0.8em; letter-spacing: 0.14em; }
+.gd-info-mod.off { opacity: 0.5; }
+.gd-info-vals { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 0.85em; margin-top: 2px; }
+.gd-info-vals i { font-style: normal; color: var(--ink-soft); font-size: 0.85em; margin-right: 3px; }

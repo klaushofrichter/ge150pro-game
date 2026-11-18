@@ -25,6 +25,8 @@ board says so and changes nothing on the pedal: update it with Mooer's editor.
 
 ## The board
 
+- **The preset's name** at the top (on the board and the phone): tap it to see what the preset plays, module by
+  module: on or off, the model (which amp, which cab) and its values. Nothing to change there.
 - **The signal chain** across the top shows the nine modules in the pedal's order. **ON/OFF** switches a module; tap
   its name to edit it below.
 - **The editor** shows the module's model (tap it to choose another) and a fader for each parameter: drag anywhere on

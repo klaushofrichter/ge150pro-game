@@ -51,7 +51,7 @@ export function mount(root, ctx) {
       <button type="button" class="gd-tab" data-tab="rhythm" role="tab">Rhythm</button>
       <button type="button" class="gd-tab" data-tab="setup" role="tab">Pedal</button>
     </nav>
-    <div class="card gd-now"><div class="eyebrow gd-label"></div><div class="gd-name"></div><div class="gd-conn muted"></div></div>
+    <div class="card gd-now" role="button" tabindex="0"><div class="eyebrow gd-label"></div><div class="gd-name"></div><div class="gd-conn muted"></div></div>
     <div class="gd-pages">
       <section class="gd-page gd-play" data-page="play">
         <div class="gd-step"><button type="button" class="gd-prev" aria-label="Previous preset">◀</button>
@@ -80,6 +80,10 @@ export function mount(root, ctx) {
         <div class="gd-list"></div>
       </section>
     </div>
+    <div class="gd-ask-wrap gd-info-wrap" hidden><div class="card gd-ask gd-info" role="dialog" aria-labelledby="gd-info-title">
+      <div class="gd-ask-title" id="gd-info-title"></div><div class="gd-info-mods"></div>
+      <div class="gd-ask-text muted gd-info-note"></div>
+      <div class="gd-ask-btns"><button type="button" class="primary gd-info-close">Close</button></div></div></div>
     <div class="gd-ask-wrap gd-del-wrap" hidden><div class="card gd-ask" role="alertdialog" aria-labelledby="gd-del-title">
       <div class="gd-ask-title gd-del-title" id="gd-del-title"></div><div class="gd-ask-text gd-del-text muted"></div>
       <div class="gd-ask-btns"><button type="button" class="gd-del-yes">Delete</button><button type="button" class="primary gd-del-no">Cancel</button></div></div></div>
@@ -206,6 +210,25 @@ export function mount(root, ctx) {
     else send(a.intent, { ...a.payload, ...(save ? { save: true } : {}) }); // (closes the question too)
   }
   $(".gd-ask-save").addEventListener("click", () => answer(true));
+  // Tap the preset: what it plays now, module by module; nothing to change here (E-024)
+  function drawInfo() {
+    const p = view?.pedal;
+    if (!p || !lib) return;
+    $(".gd-info-wrap .gd-ask-title").textContent = p.current ? `${label(p.current)} · ${p.names[p.current - 1]?.trim() || "—"}${p.modified ? " *" : ""}` : "GE150 Pro";
+    const mods = p.chain.map((m, s) => {
+      const mm = lib.model(s, m.type);
+      const vals = m.on && mm && m.values ? mm.params.map((q) => `<span><i>${esc(q.name)}</i> ${esc(lib.formatValue(q, m.values[q.pos]))}</span>`).join("") : "";
+      return `<div class="gd-info-mod ${m.on ? "" : "off"}"><div><b>${esc(lib.catalog.slots[s].name)}</b> ${m.on ? "On" : "Off"}${mm ? ` · ${esc(mm.name)}` : ""}</div>
+        ${vals ? `<div class="gd-info-vals">${vals}</div>` : ""}</div>`;
+    }).join("");
+    setHtml($(".gd-info-mods"), mods || `<div class="muted">Not known yet: the board has not reported the pedal.</div>`);
+    $(".gd-info-note").textContent = `As the pedal plays it now${p.modified ? ", with unsaved changes (*)" : ""}. Change modules on the board, or in the GE150 Pro Editor web app.`;
+  }
+  $(".gd-now").addEventListener("click", () => {
+    drawInfo();
+    $(".gd-info-wrap").hidden = false;
+  });
+  $(".gd-info-close").addEventListener("click", () => ($(".gd-info-wrap").hidden = true));
   $(".gd-del-no").addEventListener("click", () => ($(".gd-del-wrap").hidden = true));
   $(".gd-del-yes").addEventListener("click", () => {
     $(".gd-del-wrap").hidden = true;
@@ -288,6 +311,7 @@ export function mount(root, ctx) {
         store(v.configs);
       }
       draw();
+      if (!$(".gd-info-wrap").hidden) drawInfo(); // follows the pedal while open
     },
     destroy() {
       clearInterval(beatTimer);
