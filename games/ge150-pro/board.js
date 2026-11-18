@@ -63,7 +63,7 @@ export function mount(root, ctx) {
     <div class="gp-bar">
       <div class="gp-conn"><span class="gp-dot"></span><div class="gp-conn-text"></div>
         <button class="gp-btn primary gp-connect" type="button" hidden>Connect pedal</button></div>
-      <div class="gp-now"><div class="gp-label"></div><div class="gp-name"></div></div>
+      <div class="gp-now" role="button" tabindex="0" title="What this preset plays"><div class="gp-label"></div><div class="gp-name"></div></div>
       <div class="gp-bar-right"><button class="gp-btn gp-save" type="button">Save preset…</button></div>
     </div>
     <div class="gp-chain" role="list"></div>
@@ -187,7 +187,7 @@ export function mount(root, ctx) {
       if (Object.keys(p).length) ctx.act(playerSeat(), "pedal", p);
     }, REPORT_MS);
   }
-  const chainOf = (mods) => mods.map((m) => ({ on: m.on, type: m.type }));
+  const chainOf = (mods) => mods.map((m) => ({ on: m.on, type: m.type, values: [...m.values] }));
   const sameModule = (a, b) => a && b && a.on === b.on && a.type === b.type && a.values.every((v, i) => v === b.values[i]);
   /** The live modules as Save keeps them: without the expression pedal's position (playing, not an edit). */
   const kept = () => {
@@ -753,6 +753,31 @@ export function mount(root, ctx) {
     );
   }
 
+  /** The current preset as the pedal plays it: every module with its switch, model and values; nothing to change (E-024). */
+  function openPresetInfo() {
+    if (!lib || !modules || !current) return;
+    const name = stored.get(current)?.name?.trim() || lib.presetLabel(current);
+    openSheet(
+      `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(lib.presetLabel(current))} · ${esc(name)}${modifiedNow() ? " *" : ""}</div></div>
+      <div class="gp-cfg-mods">${modulesHtml(modules.map((m, s) => [s, m]))}</div>
+      <p class="gp-sheet-text muted">As the pedal plays it now${modifiedNow() ? ", with unsaved changes (*)" : ""}. Change modules in the signal chain above, or in the GE150 Pro Editor web app.</p>
+      <div class="gp-sheet-btns"><button type="button" class="gp-btn primary gp-no">Close</button></div>`,
+      (el) => (el.querySelector(".gp-no").onclick = closeSheet),
+    );
+  }
+
+  /** Module cards for a sheet: [slot, {on, type, values}] → name, switch, model and (when on) its values. */
+  function modulesHtml(entries) {
+    return entries
+      .map(([s, m]) => {
+        const mm = lib.model(s, m.type);
+        const vals = m.on && mm ? mm.params.map((p) => `<span><i>${esc(p.name)}</i> ${esc(lib.formatValue(p, m.values[p.pos]))}</span>`).join("") : "";
+        return `<div class="gp-cfg-mod ${m.on ? "" : "off"}"><div class="gp-cfg-mod-head"><b>${esc(lib.catalog.slots[s].name)}</b>
+          <span>${m.on ? "On" : "Off"}${mm ? ` · ${esc(mm.name)}` : ""}</span></div>${vals ? `<div class="gp-cfg-vals">${vals}</div>` : ""}</div>`;
+      })
+      .join("");
+  }
+
   /** Load a configuration on the pedal: one on another preset switches to it first (asking about unsaved changes). */
   function loadConfig(c) {
     if (c.preset && c.preset !== current) switchFromBoard(c.preset, () => applyConfig(c, false));
@@ -766,15 +791,7 @@ export function mount(root, ctx) {
       c.preset ? `Selects ${esc(lib.presetLabel(c.preset))} ${esc(stored.get(c.preset)?.name?.trim() ?? "")} first.` : "Changes the preset that plays.",
       ...(c.tags ?? []).filter((t) => !t.startsWith("on ")).map((t) => esc(t)),
     ].join(" · ");
-    const mods = Object.entries(c.modules)
-      .map(([k, m]) => {
-        const s = Number(k);
-        const mm = lib.model(s, m.type);
-        const vals = m.on && mm ? mm.params.map((p) => `<span><i>${esc(p.name)}</i> ${esc(lib.formatValue(p, m.values[p.pos]))}</span>`).join("") : "";
-        return `<div class="gp-cfg-mod"><div class="gp-cfg-mod-head"><b>${esc(lib.catalog.slots[s].name)}</b>
-          <span>${m.on ? "On" : "Off"}${mm ? ` · ${esc(mm.name)}` : ""}</span></div>${vals ? `<div class="gp-cfg-vals">${vals}</div>` : ""}</div>`;
-      })
-      .join("");
+    const mods = modulesHtml(Object.entries(c.modules).map(([k, m]) => [Number(k), m]));
     openSheet(
       `<div class="gp-sheet-head"><div class="gp-sheet-title">${esc(c.name)}</div></div>
       <p class="gp-sheet-text">${where}</p>
@@ -865,6 +882,7 @@ export function mount(root, ctx) {
   $(".gp-connect").addEventListener("click", () => connect(true));
   $(".gp-notice-connect").addEventListener("click", () => connect(true));
   $(".gp-save").addEventListener("click", openSave);
+  $(".gp-now").addEventListener("click", openPresetInfo);
   $(".gp-model").addEventListener("click", openModels);
   $(".gp-capture").addEventListener("click", openCapture);
   $(".gp-file-save").addEventListener("click", saveFile);

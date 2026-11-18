@@ -53,8 +53,8 @@ export interface Pedal {
   current: number;
   /** Names of the 200 presets ("" until known). */
   names: string[];
-  /** On/off and model of the nine modules of the current preset. */
-  chain: { on: boolean; type: number }[];
+  /** On/off, model and (from the board, E-024) raw values of the nine modules as the pedal plays them now. */
+  chain: { on: boolean; type: number; values?: number[] }[];
   /** Unsaved changes on the current preset. */
   modified: boolean;
   rhythm: PedalRhythm | null;
@@ -199,7 +199,8 @@ function pedalPatch(state: State, p: Record<string, unknown>): Pedal | { reject:
   if ("chain" in p) {
     const chain = Array.isArray(p.chain) ? p.chain : [];
     if (chain.length !== SLOTS || !chain.every((m) => typeof m?.on === "boolean" && int(m?.type, 0, 255) !== null)) return { reject: "The signal chain is incomplete" };
-    next.chain = chain.map((m) => ({ on: m.on as boolean, type: m.type as number }));
+    const values = (v: unknown) => (Array.isArray(v) && v.length === 10 && v.every((x) => int(x, 0, 65535) !== null) ? { values: v as number[] } : {});
+    next.chain = chain.map((m) => ({ on: m.on as boolean, type: m.type as number, ...values(m.values) }));
   }
   if ("modified" in p) next.modified = p.modified === true;
   if ("rhythm" in p) next.rhythm = p.rhythm === null ? null : rhythm(p.rhythm);

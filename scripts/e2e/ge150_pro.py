@@ -143,6 +143,23 @@ def main():
             board.locator(".gp-sheet .gp-no").click()
             assert board.locator(".gp-apply").first.inner_text() == "Load"
 
+            # E-024: the preset's name in the middle of the bar; tapping it (board or phone) shows what the preset plays.
+            nb = board.locator(".gp-now").bounding_box()
+            assert abs(nb["x"] + nb["width"] / 2 - 960) < 40, f"the preset's name is centered: {nb}"
+            board.locator(".gp-now").click()
+            board.wait_for_selector(".gp-sheet .gp-cfg-mod")
+            assert board.locator(".gp-sheet .gp-cfg-mod").count() == 9, "every module of the preset"
+            info = board.locator(".gp-sheet").inner_text()
+            assert "AMP" in info and "GAIN" in info and "CAB" in info, info
+            assert board.locator(".gp-sheet button").count() == 1, "nothing to change there: only Close"
+            shot(board, "board-preset-info")
+            board.locator(".gp-sheet .gp-no").click()
+            deck.locator(".gd-now").click()
+            wait(lambda: deck.locator(".gd-info-wrap").is_visible(), 5, "the phone's preset window")
+            wait(lambda: deck.locator(".gd-info-mod").count() == 9 and "GAIN" in deck.locator(".gd-info-mods").inner_text(), 5, "the modules with values on the phone")
+            shot(deck, "phone-preset-info")
+            deck.locator(".gd-info-close").click()
+
             # E-023: all configurations to one file and back; X asks before deleting, on the board and the phone.
             board.locator(".gp-file-save").click()
             with board.expect_download() as dl:
