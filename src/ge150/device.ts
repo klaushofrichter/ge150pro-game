@@ -7,7 +7,7 @@ import { Cmd, handshake, isModuleReport, requestCurrent, selectPreset, setModule
 import { ConnectCheck, type CompatResult } from './compat.ts';
 import { decodeModule, decodePreset, PRESET_COUNT, SLOT_COUNT, type ExpSettings, type ModuleState, type Preset } from './preset.ts';
 import { decodeRhythm, RhythmCmd, type Rhythm } from './rhythm.ts';
-import { decodeExpReport, ExpCmd } from './exp.ts';
+import { decodeExpReport, ExpCmd, setExpFunction } from './exp.ts';
 
 export const FILTER: HIDDeviceFilter = { vendorId: 0x0483, productId: 0x5703 };
 /** The connect sequence's answers must all arrive within this time. */
@@ -204,6 +204,11 @@ export class GE150Pro {
 
   setModule(slot: number, m: ModuleState) {
     return this.write(setModule(slot, m));
+  }
+
+  /** What the expression pedal controls in EXP mode (98, as the official editor sends it); live until stored. */
+  setExpFunction(e: Pick<ExpSettings, 'MODULE_CTRL' | 'PARA_CTRL' | 'FUN_SWITCH'>) {
+    return this.write(setExpFunction(e));
   }
 
   /** Persist a full preset to its slot on the device. */

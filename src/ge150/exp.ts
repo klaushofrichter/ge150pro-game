@@ -1,11 +1,13 @@
 // Expression pedal assignment, per preset. See docs/protocol.md.
 import { model, type ParamSpec } from './catalog.ts';
-import { readU16 } from './frame.ts';
+import { encodeMessage, readU16 } from './frame.ts';
 import type { ExpSettings, ModuleState } from './preset.ts';
 
 export const ExpCmd = {
   /** MODULE_CTRL, PARA_CTRL, FUN_SWITCH (u16 LE each). */
   FUNCTION: 0x18,
+  /** The same three, from the host: what the official editor sends when its EXP target changes (E-027). */
+  SET_FUNCTION: 0x98,
   /** VOL_SWITCH, VOL_MIN, VOL_MAX (u16 LE each). */
   VOLUME: 0x33,
 } as const;
@@ -39,6 +41,19 @@ export function expLabel(e: Pick<ExpSettings, 'MODULE_CTRL' | 'PARA_CTRL'>): str
 
 /** The EXP menu's name for a catalog parameter, where the two spell it differently. */
 const EXP_NAME: Record<string, string> = { FEEDBACK: 'F.BACK' };
+
+/** The PARA_CTRL id of a module's catalog parameter, if the expression pedal can control it (E-027). */
+export function expParamId(slot: number, paramName: string): number | undefined {
+  const name = EXP_NAME[paramName.toUpperCase()] ?? paramName.toUpperCase();
+  return EXP_PARAMS[slot]?.find((p) => p.name === name)?.id;
+}
+
+/** The host's EXP assignment message (98): MODULE_CTRL, PARA_CTRL, FUN_SWITCH. */
+export function setExpFunction(e: Pick<ExpSettings, 'MODULE_CTRL' | 'PARA_CTRL' | 'FUN_SWITCH'>): Uint8Array {
+  const b = new Uint8Array(6);
+  [e.MODULE_CTRL, e.PARA_CTRL, e.FUN_SWITCH].forEach((v, i) => ((b[2 * i] = v & 0xff), (b[2 * i + 1] = (v >> 8) & 0xff)));
+  return encodeMessage(ExpCmd.SET_FUNCTION, b);
+}
 
 /** The catalog parameter the expression pedal controls in a module of model `type`, if that model has it. */
 export function expTarget(e: Pick<ExpSettings, 'MODULE_CTRL' | 'PARA_CTRL'>, type: number): ParamSpec | undefined {

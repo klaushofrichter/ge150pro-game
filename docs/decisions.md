@@ -177,3 +177,12 @@ Records are history: an older record is not edited when a newer one changes it. 
   is chosen (or the chooser is closed) the board asks for fullscreen again, on the same page the table's Fullscreen
   uses. If the browser no longer allows it without a touch, the next touch anywhere brings it back. Not covered by
   the browser checks (their pedal has no chooser); to be tried on the table.
+- **E-027 · 2026-11-17 · Klaus** — Each fader the expression pedal can control gets an **EXP** toggle: tapping it makes
+  that value the preset's EXP target (one per preset, moved there without asking; the active toggle cannot be turned
+  off, since the pedal always has a target). The chain shows an **EXP** badge on the module that has it; a note says
+  when the pedal is in volume mode. A new target is an unsaved change (the `*`, Save preset…, E-021) and is stored
+  with the preset. *Implementation (Claude):* the library sends `98` (MODULE_CTRL, PARA_CTRL, FUN_SWITCH), the message
+  the official editor sends (decoded in the GE150PRO research repository); `expParamId` finds which catalog
+  parameters the pedal accepts. Fixed on the way: the board did not redraw on the pedal's EXP reports, and a target
+  chosen while the board was still reading a just-selected preset was shown as the old one; the board now shows it
+  again once the pedal has it. Configurations do not keep the EXP target.
