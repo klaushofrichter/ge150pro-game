@@ -199,3 +199,9 @@ Records are history: an older record is not edited when a newer one changes it. 
   which the pedal reports in `18` when its toe switch changes; the live read (`B0`) does not take the stored preset
   again, so unsaved edits stay. Not tried on the pedal: whether the value jumps to the pedal's position on the switch,
   and volume mode in a preset whose EXP VOL is off.
+- **E-029 · 2026-11-18 · Klaus** — Tapping the bank name ("Bank 14") on the board opens every bank, a row each with
+  its A–D presets; the shown bank is marked and in view, the playing preset outlined. Tapping a preset (or a bank's
+  number) shows that bank on the right and closes the window; it selects nothing on the pedal. This window and the
+  model window scroll with the platform's wide bar for a finger (`touchScroll`, games-service D-306) instead of the
+  browser's thin one. *Implementation (Claude):* the board kit is imported as a namespace and `touchScroll` used only
+  where the table has it, so an older table still runs the game with the browser's bar.
