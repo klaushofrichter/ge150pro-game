@@ -73,6 +73,34 @@ describe("GE150 Pro", () => {
     expect((rt.boardView() as any).commands.map((c: any) => c.n)).toEqual([3]);
   });
 
+  it("keeps the other screen from switching while one asks about unsaved changes (E-021)", () => {
+    const { rt } = connected();
+    const v = () => rt.boardView() as any;
+    // the board asks: the phone may not select or apply, nor open its own question
+    expect(rt.submit(0, { name: "confirm", payload: { from: "board", on: true } }, "board")).toEqual({ ok: true });
+    expect(v().confirming).toBe("board");
+    expect(rt.view(0)).toEqual(rt.boardView());
+    expect(rt.submit(0, { name: "select", payload: { step: 1 } }, "human")).toEqual({ ok: false, reason: "The board is asking about unsaved changes" });
+    expect(rt.submit(0, { name: "confirm", payload: { from: "deck", on: true } }, "human")).toMatchObject({ ok: false });
+    expect(rt.submit(0, { name: "confirm", payload: { from: "board", on: false } }, "board")).toEqual({ ok: true });
+    expect(v().confirming).toBe(null);
+    // the phone asks, then answers "save and switch": the board saves first, then selects, and the question closes
+    expect(rt.submit(0, { name: "confirm", payload: { from: "deck", on: true } }, "human")).toEqual({ ok: true });
+    expect(rt.submit(0, { name: "confirm", payload: { from: "board", on: true } }, "board")).toMatchObject({ ok: false });
+    expect(rt.submit(0, { name: "select", payload: { step: 1, save: true } }, "human")).toEqual({ ok: true });
+    expect(v().commands.map((c: any) => c.kind)).toEqual(["save", "select"]);
+    expect(v().confirming).toBe(null);
+    // a footswitch on the pedal makes an open question moot
+    rt.submit(0, { name: "confirm", payload: { from: "deck", on: true } }, "human");
+    rt.submit(0, { name: "switched", payload: { index: 9 } }, "board");
+    expect(v().confirming).toBe(null);
+    // closing someone else's question does nothing; nonsense is refused
+    rt.submit(0, { name: "confirm", payload: { from: "board", on: true } }, "board");
+    rt.submit(0, { name: "confirm", payload: { from: "deck", on: false } }, "human");
+    expect(v().confirming).toBe("board");
+    expect(rt.submit(0, { name: "confirm", payload: { from: "nobody", on: true } }, "human")).toEqual({ ok: false, reason: "Unknown question" });
+  });
+
   it("wraps around the 200 presets", () => {
     const { rt } = connected();
     rt.submit(0, { name: "select", payload: { index: 200 } }, "human");
