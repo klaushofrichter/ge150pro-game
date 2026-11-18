@@ -7,6 +7,9 @@
 // that move to the table once. On a table without game data (an older platform) they live in this phone's browser
 // between games: sent to the game once, kept up to date from it (E-006).
 import { esc, useStyles } from "/shared/board-kit.js";
+/** The version the table loaded this file with (`?v=…`): the stylesheet and the library too, so an update is not
+ * served from the browser's cache (the table versions only this file). */
+const VERSIONED = new URL(import.meta.url).search;
 
 const ID = "ge150-pro";
 const STORE = "ge150-pro.configs";
@@ -44,7 +47,7 @@ function store(configs) {
 }
 
 export function mount(root, ctx) {
-  useStyles(`/games/${ID}/deck.css`);
+  useStyles(`/games/${ID}/deck.css${VERSIONED}`);
   root.innerHTML = `<div class="gd">
     <nav class="gd-tabs" role="tablist">
       <button type="button" class="gd-tab on" data-tab="play" role="tab">Preset</button>
@@ -97,7 +100,7 @@ export function mount(root, ctx) {
   /** The open "save before switching?" question (E-021): what to send once answered, and the preset it was about. */
   let ask = null;
 
-  import(ctx.assetUrl("ge150.js")).then((m) => {
+  import(ctx.assetUrl("ge150.js") + VERSIONED).then((m) => {
     lib = m;
     draw();
   });
