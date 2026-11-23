@@ -6,6 +6,10 @@
 <!-- No release badge: this repository cuts no releases; tables run whatever the production branch holds, and the game's
      calendar version is in games/ge150-pro/manifest.json. -->
 
+**New to Game Table?** The website shows what it is: [games.skylar.technology](https://games.skylar.technology).
+Questions and answers about getting started, building and changing games, and playing them:
+[games.skylar.technology/faq](https://games.skylar.technology/faq).
+
 Remote control for a **Mooer GE150 Pro** guitar multi-effects pedal as a game for
 [Game Table](https://github.com/klaushofrichter/games-service): the pedal is connected to the table's computer by USB,
 the board (the table's touchscreen) shapes its sound, and the player's phone recalls sounds and runs a click while they
