@@ -18,6 +18,6 @@
     "@types/w3c-web-hid": "^1.0.7",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   }
 }
