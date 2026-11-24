@@ -88,6 +88,12 @@ def main():
                 deck.locator("#tab-game").click()
             wait(lambda: "Preset 5" in deck.locator(".gd-name").inner_text(), 10, "the phone to show the current preset")
             shot(board, "board")
+            # The settings window during the game (games-service D-326): the running board's items, with Connect the
+            # pedal again among them.
+            board.click("#settings-button")
+            board.locator('.game-settings .row:has-text("Connect the pedal again")').wait_for(timeout=5000)
+            assert board.locator('.game-settings .row:has-text("Click volume")').count() == 1, "the click volume is missing"
+            board.locator(".overlay [data-close-overlay]").first.click()
             # Turned to North: the connection and Save stay at the top of the screen, clear of the platform's buttons.
             a("POST", "/face", {"edge": "north"})
             wait(lambda: board.locator(".gp-root.gp-north").count(), 5, "the board to turn north")
