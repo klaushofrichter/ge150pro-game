@@ -233,3 +233,9 @@ Records are history: an older record is not edited when a newer one changes it. 
   **Remove** (after asking) and **Close**. The rules shown on the phone describe both tabs. *Implementation (Claude):*
   pointer events for the drags (the sorting listens on the window: moving the entry in the page would drop a pointer
   capture), a 550 ms hold for the details.
+- **E-032 · 2026-11-24 · Klaus** — **The settings window's *Connect the pedal again* comes from the running board**
+  (games-service D-326, "do this optimization, but for all games for consistency"). The object `mount` returns has
+  `settings()`, which adds the button with that board's own reconnect; the module's export still gives the click
+  volume and the confirm switch before the game is on the table. The file-level `live` goes. A table with a
+  games-service from before D-326 shows no *Connect the pedal again* button. Check: `scripts/e2e/ge150_pro.py` (the
+  settings window during the game).
