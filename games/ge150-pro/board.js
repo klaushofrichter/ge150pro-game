@@ -38,10 +38,11 @@ const STATES = {
 };
 const prefsOf = (info) => ({ volume: VOLUMES.includes(info?.prefs?.volume) ? info.prefs.volume : 60, confirm: info?.prefs?.confirm === true });
 
-/** The mounted board, for the settings window. */
-let live = null;
-
-export function settings({ info, setPrefs }) {
+/**
+ * The settings window's items. The running board adds *Connect the pedal again* (the platform asks it, games-service
+ * D-326); before the game is on the table, the module's export gives the rest.
+ */
+export function settings({ info, setPrefs }, reconnect = null) {
   const p = prefsOf(info);
   return [
     {
@@ -59,7 +60,7 @@ export function settings({ info, setPrefs }) {
       value: p.confirm,
       onChange: (v) => setPrefs({ confirm: v === true }),
     },
-    { type: "button", label: "Pedal", action: "Connect the pedal again", onChange: () => live?.reconnect() },
+    ...(reconnect ? [{ type: "button", label: "Pedal", action: "Connect the pedal again", onChange: reconnect }] : []),
     { type: "text", label: "Requires", value: `Mooer GE150 Pro by USB, firmware ${MIN_FIRMWARE} or newer` },
   ];
 }
@@ -1290,7 +1291,6 @@ export function mount(root, ctx) {
     destroy() {
       dead = true;
       clearTimeout(tableRetry);
-      if (live === inst) live = null;
       clearTimeout(reportTimer);
       clearTimeout(noticeTimer);
       dropEdits();
@@ -1300,6 +1300,6 @@ export function mount(root, ctx) {
       box.remove();
     },
   };
-  live = inst;
+  inst.settings = (args) => settings(args, () => inst.reconnect());
   return inst;
 }
