@@ -94,8 +94,10 @@ these; it checks only the sizes of the connect answers `32`, `12` and `11`.
 
 Parameter ids per slot: FX 0–9 and 100, DS 10–12, AMP 13–18, CAB 19–20, NS 21–24, EQ 25–38, MOD 39–50 and
 101–108, DLY 51–56, REV 57–60 and 109 (names in `src/ge150/exp.ts`). Moving a connected expression pedal produces the
-controlled module's report (`02`–`0A`). The game reads `18` and `33` to show the assignment; it does not send `98` or
-`B3`.
+controlled module's report (`02`–`0A`). The game reads `18` and `33` to show the assignment. It sends `98` (the target and
+the toe switch's mode, as Mooer's editor does) from a fader's EXP toggle, and after every selection from the host
+that left the previous preset's target or mode in place (E-027, E-030); it never sends `B3`, so a preset keeps its own volume range when
+it is stored (E-034).
 
 ## Drum machine
 

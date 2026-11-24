@@ -29,8 +29,12 @@ export interface Config {
   modules: Record<string, ModuleSnap>;
 }
 
-/** Something the board does on the pedal for the phone, numbered so the board does each once (E-003). */
-export type NewCommand = { kind: "select"; index: number } | { kind: "apply"; config: Config } | { kind: "save" };
+/**
+ * Something the board does on the pedal for the phone, numbered so the board does each once (E-003). A save names the
+ * preset the phone asked about, and the board stores only while that one plays (E-034); one without `index` (logs
+ * from before) stores the current preset.
+ */
+export type NewCommand = { kind: "select"; index: number } | { kind: "apply"; config: Config } | { kind: "save"; index?: number };
 
 /** Where a "save unsaved changes before switching?" question is open (E-021): the other screen may not switch meanwhile. */
 export type Confirming = "board" | "deck" | null;
@@ -152,12 +156,15 @@ function settle(configs: Config[], newest: Config): Config[] {
 const BOARD_ASKS = "The board is asking about unsaved changes";
 
 /**
- * The phone's answer to its own question: the question closes, and with `save` the board first stores the current
- * preset (a "save" command before the switch).
+ * The phone's answer to its own question: the question closes, and with `save` the board first stores the preset it
+ * asked about (a "save" command before the switch). `saveIndex` names that preset; an answer about one that no longer
+ * plays is refused (E-034). Without it (logs from before) the answer is about the current preset.
  */
-function answered(state: State, p: Record<string, unknown>): State {
+function answered(state: State, p: Record<string, unknown>): State | { reject: string } {
+  const index = "saveIndex" in p ? int(p.saveIndex, 1, PRESETS) : state.pedal.current;
+  if (index !== state.pedal.current) return { reject: "The question was about another preset: the pedal has switched" };
   const s = state.confirming === "deck" ? { ...state, confirming: null } : state;
-  return p.save === true ? queue(s, { kind: "save" }) : s;
+  return p.save === true ? queue(s, "saveIndex" in p ? { kind: "save", index: index! } : { kind: "save" }) : s;
 }
 
 function queue(state: State, cmd: NewCommand): State {
@@ -340,7 +347,9 @@ export default defineGame<State>({
         if (!c) return { reject: "That configuration is gone" };
         if (!state.pedal.connected) return { reject: "The pedal is not connected" };
         if (state.confirming === "board") return { reject: BOARD_ASKS };
-        const next = queue(answered(state, p), { kind: "apply", config: c });
+        const a = answered(state, p);
+        if ("reject" in a) return a;
+        const next = queue(a, { kind: "apply", config: c });
         return { state: { ...next, stats: { ...state.stats, recalls: state.stats.recalls + 1 } }, events: [{ name: "apply", data: { id: c.id } }] };
       }
       case "select": {
@@ -350,7 +359,9 @@ export default defineGame<State>({
         const target = index ?? (step !== null && state.pedal.current ? ((state.pedal.current - 1 + step + PRESETS * 2) % PRESETS) + 1 : null);
         if (target === null) return { reject: "That is not a preset of the GE150 Pro" };
         if (state.confirming === "board") return { reject: BOARD_ASKS };
-        return { state: queue({ ...answered(state, p), pedal: { ...state.pedal, current: target } }, { kind: "select", index: target }) };
+        const a = answered(state, p);
+        if ("reject" in a) return a;
+        return { state: queue({ ...a, pedal: { ...state.pedal, current: target } }, { kind: "select", index: target }) };
       }
       case "confirm": {
         // a screen opens or closes its "save before switching?" question; the other screen may not switch meanwhile
@@ -377,13 +388,16 @@ export default defineGame<State>({
         // All configurations from a file, loaded on the board (E-023): they replace the ones kept, quick slots and
         // footswitches settled newest first.
         if (p.replace === true) {
-          const sent = Array.isArray(p.list) ? p.list : [];
+          // (a missing list, or a file of none, would wipe every configuration kept: refused, E-034)
+          if (!Array.isArray(p.list)) return { reject: "That is not a list of configurations" };
+          if (!p.list.length) return { reject: "The file holds no configurations" };
+          const sent = p.list;
           let configs: Config[] = [];
           for (const raw of sent) {
             const c = parseConfig(raw);
             if (c && !configs.some((x) => x.id === c.id) && configs.length < MAX_CONFIGS) configs = settle([...configs, c], c);
           }
-          if (sent.length && !configs.length) return { reject: "The file holds no configurations this game can use" };
+          if (!configs.length) return { reject: "The file holds no configurations this game can use" };
           return { state: { ...state, configs, synced: true } };
         }
         // The configurations from earlier games: the table's, sent by the board (`shared`, E-017), or on a table

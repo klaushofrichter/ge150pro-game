@@ -213,7 +213,7 @@ def main():
             assert deck.locator(".gd-cfg-mods .gd-info-mod").count() >= 1, deck.locator(".gd-cfg-wrap").inner_text()
             shot(deck, "phone-config-details")
             deck.locator(".gd-cfg-remove").click()
-            wait(lambda: deck.locator(".gd-del-wrap").is_visible(), 5, "the phone to ask before removing")
+            wait(lambda: deck.locator(".gd-q-wrap").is_visible(), 5, "the phone to ask before removing")
             deck.locator(".gd-del-no").click()
             assert deck.locator(".gd-slot:not(.empty)").count() == 1, "Cancel on the phone keeps it"
             hold(deck, deck.locator(".gd-slot:not(.empty)").first)
@@ -306,7 +306,7 @@ def main():
             start_at = board.evaluate("() => window.__pedal.state.current")
             stores = sent(board, 0xc3)
             deck.locator(".gd-next").click()
-            wait(lambda: deck.locator(".gd-switch-wrap").is_visible(), 5, "the phone to ask first")
+            wait(lambda: deck.locator(".gd-q-wrap").is_visible(), 5, "the phone to ask first")
             wait(lambda: board.locator(".gp-preset").first.is_disabled(), 5, "the board's presets to wait for the phone")
             assert "phone is asking" in board.locator(".gp-presets-hint").inner_text()
             assert board.evaluate("() => window.__pedal.state.current") == start_at, "nothing switched while asking"
@@ -379,14 +379,13 @@ def main():
             wait(lambda: board.evaluate("() => window.__pedal.state.exp[2]") == 1, 5, "EXP mode on the pedal again")
             wait(lambda: sent(board, 0xb0) > reads, 5, "a read of the live values for the pedal's position")
             wait(lambda: "vol" not in (gain.get_attribute("class") or ""), 5, "filled again in EXP mode")
-            assert board.locator(".gp-name").inner_text().endswith("*"), "the read keeps the unsaved target"
-            wait(lambda: board.locator(".gp-name").inner_text().endswith("*"), 5, "a new target is an unsaved change")
+            assert board.locator(".gp-name").inner_text().endswith("*"), "the read keeps the unsaved target (a new target is an unsaved change)"
             shot(board, "board-exp")
             target_now = board.evaluate("() => window.__pedal.state.current")
             board.locator(".gp-save").click()
             board.locator(".gp-sheet .gp-yes").click()
             wait(lambda: not board.locator(".gp-name").inner_text().endswith("*"), 5, "Save preset… to clear the mark")
-            stored_exp = board.evaluate("(i) => { const m = window.__pedal.log.filter((x) => x.cmd === 0xc3).at(-1).payload; return [m[17 + 216] | (m[18 + 216] << 8), m[19 + 216] | (m[20 + 216] << 8), m[0]]; }", target_now)
+            stored_exp = board.evaluate("() => { const m = window.__pedal.log.filter((x) => x.cmd === 0xc3).at(-1).payload; return [m[17 + 216] | (m[18 + 216] << 8), m[19 + 216] | (m[20 + 216] << 8), m[0]]; }")
             assert stored_exp == [2, 13, target_now], f"the preset stores the EXP target: {stored_exp}"
 
             # Rhythm: the pedal's drum machine by name, and the table's click.

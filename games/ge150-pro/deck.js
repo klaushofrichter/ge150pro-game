@@ -17,13 +17,16 @@ const MOVED = "ge150-pro.configs.moved"; // this phone's configurations have gon
 const FAVS = "ge150-pro.favorites"; // this phone's favorite presets, by label ("23A"), in the player's order
 const MAX_FAVS = 12;
 const LONG_MS = 550;
+/** The pedal's presets (the library's PRESET_COUNT), for what runs before the library has loaded. */
+const PRESETS = 200;
 
-/** "23A" for preset 89 and back (bank, then A-D), without the library. */
+/** "23A" for preset 89 and back (bank, then A-D), as the library's presetLabel, without it: the favorites are read and
+ * kept before it loads. */
 const labelOf = (i) => `${Math.floor((i - 1) / 4) + 1}${"ABCD"[(i - 1) % 4]}`;
 const indexOf = (l) => {
   const m = /^(\d{1,2})([A-D])$/.exec(l);
   const i = m ? (Number(m[1]) - 1) * 4 + "ABCD".indexOf(m[2]) + 1 : 0;
-  return i >= 1 && i <= 200 ? i : 0;
+  return i >= 1 && i <= PRESETS ? i : 0;
 };
 /** The favorites kept on this phone (E-031): which presets sit at those places is not checked. */
 function loadFavs() {
@@ -121,18 +124,18 @@ export function mount(root, ctx) {
       <div class="gd-ask-title gd-cfg-title" id="gd-cfg-title"></div><div class="gd-ask-text muted gd-cfg-where"></div><div class="gd-info-mods gd-cfg-mods"></div>
       <div class="gd-ask-btns"><button type="button" class="gd-cfg-rename">Rename</button><button type="button" class="gd-cfg-remove">Remove</button>
         <button type="button" class="primary gd-cfg-close">Close</button></div></div></div>
-    <div class="gd-ask-wrap gd-del-wrap" hidden><div class="card gd-ask" role="alertdialog" aria-labelledby="gd-del-title">
-      <div class="gd-ask-title gd-del-title" id="gd-del-title"></div><div class="gd-ask-text gd-del-text muted"></div>
-      <div class="gd-ask-btns"><button type="button" class="gd-del-yes">Remove</button><button type="button" class="primary gd-del-no">Cancel</button></div></div></div>
-    <div class="gd-ask-wrap gd-switch-wrap" hidden><div class="card gd-ask" role="alertdialog" aria-labelledby="gd-ask-title">
-      <div class="gd-ask-title" id="gd-ask-title"></div><div class="gd-ask-text muted"></div>
-      <div class="gd-ask-btns"><button type="button" class="primary gd-ask-save">Save and switch</button>
-        <button type="button" class="gd-ask-discard">Discard and switch</button><button type="button" class="gd-ask-cancel">Cancel</button></div></div></div>
+    <div class="gd-ask-wrap gd-q-wrap" hidden><div class="card gd-ask" role="alertdialog" aria-labelledby="gd-q-title">
+      <div class="gd-ask-title gd-q-title" id="gd-q-title"></div><div class="gd-ask-text muted gd-q-text"></div>
+      <div class="gd-ask-btns gd-q-btns"></div></div></div>
   </div>`;
   const $ = (s) => root.querySelector(s);
   let view = null, info = null, lib = null, sent = false, taps = [], beatTimer = null, beatKey = "";
   /** The open "save before switching?" question (E-021): what to send once answered, and the preset it was about. */
-  let ask = null;
+  let pendingSwitch = null;
+  /** A question left open in the view by this phone before a reload was closed (sent once, E-021). */
+  let leftoverCleared = false;
+  /** The configuration whose details are open. */
+  let openId = null;
   let favs = loadFavs();
 
   import(ctx.assetUrl("ge150.js") + VERSIONED).then((m) => {
@@ -146,7 +149,24 @@ export function mount(root, ctx) {
     el.dataset.html = markup;
     el.innerHTML = markup;
   };
-  const label = (i) => (lib && i ? lib.presetLabel(i) : i ? String(i) : "");
+  const label = (i) => (i ? (lib ? lib.presetLabel(i) : labelOf(i)) : "");
+  const configById = (id) => view?.configs.find((c) => c.id === id);
+
+  /** A question in the phone's window: `buttons` ({ label, run, primary?, cls? }) in order, each closes it first. */
+  function question(title, text, buttons) {
+    $(".gd-q-title").textContent = title;
+    $(".gd-q-text").textContent = text;
+    const row = $(".gd-q-btns");
+    row.replaceChildren(...buttons.map((b) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = [b.primary ? "primary" : "", b.cls ?? ""].join(" ").trim();
+      el.textContent = b.label;
+      el.onclick = () => (($(".gd-q-wrap").hidden = true), b.run());
+      return el;
+    }));
+    $(".gd-q-wrap").hidden = false;
+  }
   const send = (name, payload) => (view && !view.done ? ctx.send(name, payload) : null);
 
   let tab = "play";
@@ -209,20 +229,31 @@ export function mount(root, ctx) {
     const rows = favs.map((i) => {
       const on = i === p.current;
       return `<div class="gd-fav ${on ? "on" : ""}" data-index="${i}"><span class="gd-fav-grip" aria-label="Drag to sort">⋮⋮</span>
-        <button type="button" class="gd-fav-pick" data-index="${i}" ${can ? "" : "disabled"}><b>${labelOf(i)}</b><span>${esc(p.names[i - 1]?.trim() || "—")}</span>${on && p.modified ? `<i class="gd-mod">modified</i>` : ""}</button>
-        <button type="button" class="gd-fav-del" data-index="${i}" aria-label="Remove ${labelOf(i)} from the favorites">−</button></div>`;
+        <button type="button" class="gd-fav-pick" data-index="${i}" ${can ? "" : "disabled"}><b>${label(i)}</b><span>${esc(p.names[i - 1]?.trim() || "—")}</span>${on && p.modified ? `<i class="gd-mod">modified</i>` : ""}</button>
+        <button type="button" class="gd-fav-del" data-index="${i}" aria-label="Remove ${label(i)} from the favorites">−</button></div>`;
     }).join("");
     setHtml($(".gd-favs"), rows || `<div class="muted gd-empty">Your favorite presets, in your order, kept on this phone: tap + on the preset above, or drag the preset down here.</div>`);
     $(".gd-favs-count").textContent = `${favs.length} of ${MAX_FAVS}`;
     fitFavs();
   }
-  /** The favorites scroll inside the page, which itself fits the screen (E-020). */
+  /**
+   * The favorites scroll inside the page, which itself fits the screen (E-020). Measured (a layout) only when the
+   * list, the tab or what stands above the list changed, and on a resize.
+   */
+  let fitKey = ""; // what the list was measured for ("" measures again)
   function fitFavs() {
+    if (tab !== "play") return void (fitKey = "");
+    const key = [".gd-label", ".gd-name", ".gd-conn", ".gd-exp-badge", ".gd-board-asks"]
+      .map((s) => ($(s).hidden ? "" : $(s).textContent))
+      .concat($(".gd-favs").dataset.html)
+      .join("|");
+    if (key === fitKey) return;
+    fitKey = key;
     const el = $(".gd-favs");
-    if (tab !== "play") return;
     el.style.maxHeight = `${Math.max(150, window.innerHeight - el.getBoundingClientRect().top - 12)}px`;
   }
-  window.addEventListener("resize", fitFavs);
+  const onResize = () => ((fitKey = ""), fitFavs());
+  window.addEventListener("resize", onResize);
 
   /** The quick slots and the other configurations: tap loads, a long press shows details, Rename and Remove. */
   function drawSlots(can) {
@@ -262,28 +293,43 @@ export function mount(root, ctx) {
    * A switch to another preset asked for here (`intent` with its payload). With the table's setting on and unsaved
    * changes, the phone asks first whether to save them; the board cannot switch while it asks (E-021).
    */
-  function switchFromPhone(target, intent, payload) {
-    if (!view || view.confirming === "board") return;
+  async function switchFromPhone(target, intent, payload) {
+    if (!view || view.confirming === "board" || pendingSwitch) return;
     const p = view.pedal;
     if (!info?.prefs?.confirm || !p.modified || !target) return send(intent, payload);
     const from = label(p.current), to = label(target);
     const name = p.names[p.current - 1]?.trim() || from;
-    ask = { intent, payload, current: p.current };
-    $(".gd-ask-title").textContent = `Save the changes to ${from}?`;
-    $(".gd-ask-text").textContent = `"${name}" has unsaved changes. ${to === from ? `Selecting ${to} again reloads it and` : `Switching to ${to}`} discards them, unless you save them to ${from} first.`;
-    $(".gd-switch-wrap").hidden = false;
-    send("confirm", { from: "deck", on: true });
+    const asked = (pendingSwitch = { intent, payload, current: p.current });
+    // the question opens only once the rules took it: the board may be asking already (E-034; the platform shows
+    // the rules' reason)
+    const r = await Promise.resolve(send("confirm", { from: "deck", on: true })).catch(() => null);
+    if (pendingSwitch !== asked) return; // answered meanwhile (the pedal switched by itself)
+    if (!r?.ok) {
+      pendingSwitch = null;
+      return;
+    }
+    question(
+      `Save the changes to ${from}?`,
+      `"${name}" has unsaved changes. ${to === from ? `Selecting ${to} again reloads it and` : `Switching to ${to}`} discards them, unless you save them to ${from} first.`,
+      [
+        { label: "Save and switch", primary: true, cls: "gd-ask-save", run: () => answer(true) },
+        { label: "Discard and switch", cls: "gd-ask-discard", run: () => answer(false) },
+        { label: "Cancel", cls: "gd-ask-cancel", run: () => answer(null) },
+      ],
+    );
   }
   /** Answer the question: `save` (true/false) switches, null cancels. */
   function answer(save) {
-    const a = ask;
-    ask = null;
-    $(".gd-switch-wrap").hidden = true;
+    const a = pendingSwitch;
+    pendingSwitch = null;
+    $(".gd-q-wrap").hidden = true;
     if (!a) return;
-    if (save === null) send("confirm", { from: "deck", on: false });
-    else send(a.intent, { ...a.payload, ...(save ? { save: true } : {}) }); // (closes the question too)
+    if (save === null) return send("confirm", { from: "deck", on: false });
+    // (closes the question too; a save names the preset asked about, refused if the pedal switched meanwhile, E-034)
+    Promise.resolve(send(a.intent, { ...a.payload, ...(save ? { save: true, saveIndex: a.current } : {}) }))
+      .then((r) => r && !r.ok && send("confirm", { from: "deck", on: false }))
+      .catch(() => {});
   }
-  $(".gd-ask-save").addEventListener("click", () => answer(true));
   // Tap the preset: what it plays now, module by module; nothing to change here (E-024)
   function drawInfo() {
     const p = view?.pedal;
@@ -310,14 +356,10 @@ export function mount(root, ctx) {
     $(".gd-info-wrap").hidden = false;
   });
   $(".gd-info-close").addEventListener("click", () => ($(".gd-info-wrap").hidden = true));
-  $(".gd-del-no").addEventListener("click", () => ($(".gd-del-wrap").hidden = true));
-  $(".gd-del-yes").addEventListener("click", () => {
-    $(".gd-del-wrap").hidden = true;
-    send("edit", { id: $(".gd-del-wrap").dataset.id, remove: true });
-  });
-  $(".gd-ask-discard").addEventListener("click", () => answer(false));
-  $(".gd-ask-cancel").addEventListener("click", () => answer(null));
-  const stepTarget = (step) => (view?.pedal.current ? ((view.pedal.current - 1 + step + 400) % 200) + 1 : 0);
+  const stepTarget = (step) => {
+    const n = lib?.PRESET_COUNT ?? PRESETS;
+    return view?.pedal.current ? ((view.pedal.current - 1 + step + n) % n) + 1 : 0;
+  };
   $(".gd-prev").addEventListener("click", () => switchFromPhone(stepTarget(-1), "select", { step: -1 }));
   $(".gd-next").addEventListener("click", () => switchFromPhone(stepTarget(1), "select", { step: 1 }));
   // ---- favorites (E-031) ------------------------------------------------------------------------------------------
@@ -380,8 +422,9 @@ export function mount(root, ctx) {
       card.classList.add("dragging");
       $(".gd-favs").classList.toggle("drop", over(ev));
     };
+    const gesture = new AbortController();
     const end = (ev) => {
-      card.removeEventListener("pointermove", move);
+      gesture.abort(); // (move, and both ends)
       card.style.transform = "";
       card.classList.remove("dragging");
       $(".gd-favs").classList.remove("drop");
@@ -390,9 +433,7 @@ export function mount(root, ctx) {
       setTimeout(() => (dragged = false), 400);
       if (ev.type === "pointerup" && over(ev)) addFav(view.pedal.current);
     };
-    card.addEventListener("pointermove", move);
-    card.addEventListener("pointerup", end, { once: true });
-    card.addEventListener("pointercancel", end, { once: true });
+    for (const [t, f] of [["pointermove", move], ["pointerup", end], ["pointercancel", end]]) card.addEventListener(t, f, { signal: gesture.signal });
   });
 
   // ---- configurations: tap loads, a long press opens the details -------------------------------------------------
@@ -408,19 +449,20 @@ export function mount(root, ctx) {
       ctx.vibrate(40);
       openConfig(b.dataset.id);
     }, LONG_MS);
+    const gesture = new AbortController();
     const stop = () => {
       clearTimeout(timer);
-      holdable.removeEventListener("pointermove", drift);
+      gesture.abort(); // (the drift and both ends)
     };
     const drift = (ev) => Math.hypot(ev.clientX - x0, ev.clientY - y0) > 10 && stop();
-    holdable.addEventListener("pointermove", drift);
-    for (const t of ["pointerup", "pointercancel"]) holdable.addEventListener(t, stop, { once: true });
+    holdable.addEventListener("pointermove", drift, { signal: gesture.signal });
+    for (const t of ["pointerup", "pointercancel"]) holdable.addEventListener(t, stop, { signal: gesture.signal });
   });
   holdable.addEventListener("contextmenu", (e) => e.target.closest(".gd-slot") && e.preventDefault());
   function openConfig(id) {
-    const c = view?.configs.find((x) => x.id === id);
+    const c = configById(id);
     if (!c) return;
-    $(".gd-cfg-wrap").dataset.id = id;
+    openId = id;
     $(".gd-cfg-title").textContent = c.name;
     $(".gd-cfg-where").textContent = [
       c.preset ? `Selects ${label(c.preset)} ${view.pedal.names[c.preset - 1]?.trim() ?? ""} first.` : "Changes the preset that plays.",
@@ -433,21 +475,21 @@ export function mount(root, ctx) {
   }
   $(".gd-cfg-close").addEventListener("click", () => ($(".gd-cfg-wrap").hidden = true));
   $(".gd-cfg-rename").addEventListener("click", () => {
-    const c = view.configs.find((x) => x.id === $(".gd-cfg-wrap").dataset.id);
+    const c = configById(openId);
     const name = c && prompt("Name of the configuration (up to 24 characters):", c.name);
     if (name && name.trim()) send("edit", { id: c.id, name: name.trim().slice(0, 24) });
     $(".gd-cfg-wrap").hidden = true;
   });
   $(".gd-cfg-remove").addEventListener("click", () => {
-    const c = view.configs.find((x) => x.id === $(".gd-cfg-wrap").dataset.id);
+    const c = configById(openId);
     $(".gd-cfg-wrap").hidden = true;
     if (!c) return;
     // deleting takes it from the table for everyone, without undo: ask first (E-023)
     const tags = (c.tags ?? []).filter((t) => !t.startsWith("on "));
-    $(".gd-del-title").textContent = `Remove "${c.name}"?`;
-    $(".gd-del-text").textContent = `${tags.length ? `It is on ${tags.join(" and ")}. ` : ""}It is gone for everyone who plays at this table.`;
-    $(".gd-del-wrap").dataset.id = c.id;
-    $(".gd-del-wrap").hidden = false;
+    question(`Remove "${c.name}"?`, `${tags.length ? `It is on ${tags.join(" and ")}. ` : ""}It is gone for everyone who plays at this table.`, [
+      { label: "Remove", cls: "gd-del-yes", run: () => send("edit", { id: c.id, remove: true }) },
+      { label: "Cancel", primary: true, cls: "gd-del-no", run: () => {} },
+    ]);
   });
   holdable.addEventListener("click", (e) => {
     const b = e.target.closest(".gd-slot");
@@ -455,7 +497,7 @@ export function mount(root, ctx) {
     if (!b?.dataset.id || !view || b.dataset.nocall) return;
     ctx.vibrate(30);
     // a configuration on another preset switches to it first
-    const c = view.configs.find((x) => x.id === b.dataset.id);
+    const c = configById(b.dataset.id);
     if (c?.preset && c.preset !== view.pedal.current) switchFromPhone(c.preset, "apply", { id: c.id });
     else send("apply", { id: b.dataset.id });
   });
@@ -482,8 +524,12 @@ export function mount(root, ctx) {
     update(v, _events, i) {
       view = v;
       info = i ?? info;
-      if (ask && (v.pedal.current !== ask.current || v.done)) answer(null); // the pedal switched by itself: moot
-      else if (!ask && v.confirming === "deck" && !v.done) send("confirm", { from: "deck", on: false }); // left over from before a reload
+      if (!v.confirming) leftoverCleared = false;
+      if (pendingSwitch && (v.pedal.current !== pendingSwitch.current || v.done)) answer(null); // the pedal switched by itself: moot
+      else if (!pendingSwitch && v.confirming === "deck" && !v.done && !leftoverCleared) {
+        leftoverCleared = true; // left over from before a reload: closed once
+        send("confirm", { from: "deck", on: false });
+      }
       if (ctx.store) {
         // The table keeps the configurations and the board has brought them (E-017): what this phone kept before
         // joins them, once, and from then on the phone keeps nothing.
@@ -508,6 +554,7 @@ export function mount(root, ctx) {
     },
     destroy() {
       clearInterval(beatTimer);
+      window.removeEventListener("resize", onResize);
     },
   };
 }
