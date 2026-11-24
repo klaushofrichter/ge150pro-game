@@ -263,3 +263,20 @@ Records are history: an older record is not edited when a newer one changes it. 
   wait for the save's acknowledgement in the library, asset versioning, fullscreen after the chooser by the platform,
   room for the scrollbar, the north bar's coordinates. *Why:* less code to read and keep in step, fewer redraws and
   listeners. Check: `npm test`, `npm run typecheck`, the three browser checks.
+- **E-034 · 2026-11-24 · Klaus** — **The code review that followed E-033.** No new pedal commands: the fixes change
+  only what goes into a `C3` write, or whether one is sent at all. (1) **Save preset… keeps the preset's own volume
+  range.** After a selection from the host the pedal keeps the previous preset's EXP target and volume range (E-030);
+  the board puts back the target (`98`) but cannot set the range (it never sends `B3`), and Save took the whole live
+  EXP setting, so it wrote the previous preset's range into the new slot. The board has no control for the range, so
+  Save now takes only the target (`MODULE_CTRL`, `PARA_CTRL`) from the live setting and keeps the preset's own toe-switch
+  mode and range. (2) **The phone's "Save and switch" saves only the preset it asked about.** The answer carries
+  `saveIndex` and the queued save its `index`; the rules refuse an answer about a preset that no longer plays, and the
+  board skips (with a notice) a queued save whose preset is not the one playing. An answer or save without the index
+  (logs from before) means the current preset, as before. (3) **One question at a time.** The board and the phone open
+  "Save the changes first?" only once the rules took their `confirm`; refused (the other screen asks), nothing opens
+  and the platform shows the reason. (4) **Load all from file… cannot wipe the configurations by accident:** a
+  replacement without a list is refused, and one of none says "The file holds no configurations". (5) `protocol.md`
+  says the game sends `98` (EXP toggle, and after a selection from the host) and never `B3`. *Check:* `npm test`
+  (the answer for another preset refused without a change, the save carrying its index, the empty and missing
+  lists), `npm run typecheck`, the three browser checks; `scripts/e2e/ge150_pro_flows.py` saves 14C after selecting it
+  from the banks and checks its own range (20–80 in the simulated pedal) in the `C3`.

@@ -293,13 +293,21 @@ export function mount(root, ctx) {
    * A switch to another preset asked for here (`intent` with its payload). With the table's setting on and unsaved
    * changes, the phone asks first whether to save them; the board cannot switch while it asks (E-021).
    */
-  function switchFromPhone(target, intent, payload) {
-    if (!view || view.confirming === "board") return;
+  async function switchFromPhone(target, intent, payload) {
+    if (!view || view.confirming === "board" || pendingSwitch) return;
     const p = view.pedal;
     if (!info?.prefs?.confirm || !p.modified || !target) return send(intent, payload);
     const from = label(p.current), to = label(target);
     const name = p.names[p.current - 1]?.trim() || from;
-    pendingSwitch = { intent, payload, current: p.current };
+    const asked = (pendingSwitch = { intent, payload, current: p.current });
+    // the question opens only once the rules took it: the board may be asking already (E-034; the platform shows
+    // the rules' reason)
+    const r = await Promise.resolve(send("confirm", { from: "deck", on: true })).catch(() => null);
+    if (pendingSwitch !== asked) return; // answered meanwhile (the pedal switched by itself)
+    if (!r?.ok) {
+      pendingSwitch = null;
+      return;
+    }
     question(
       `Save the changes to ${from}?`,
       `"${name}" has unsaved changes. ${to === from ? `Selecting ${to} again reloads it and` : `Switching to ${to}`} discards them, unless you save them to ${from} first.`,
@@ -309,7 +317,6 @@ export function mount(root, ctx) {
         { label: "Cancel", cls: "gd-ask-cancel", run: () => answer(null) },
       ],
     );
-    send("confirm", { from: "deck", on: true });
   }
   /** Answer the question: `save` (true/false) switches, null cancels. */
   function answer(save) {
@@ -317,8 +324,11 @@ export function mount(root, ctx) {
     pendingSwitch = null;
     $(".gd-q-wrap").hidden = true;
     if (!a) return;
-    if (save === null) send("confirm", { from: "deck", on: false });
-    else send(a.intent, { ...a.payload, ...(save ? { save: true } : {}) }); // (closes the question too)
+    if (save === null) return send("confirm", { from: "deck", on: false });
+    // (closes the question too; a save names the preset asked about, refused if the pedal switched meanwhile, E-034)
+    Promise.resolve(send(a.intent, { ...a.payload, ...(save ? { save: true, saveIndex: a.current } : {}) }))
+      .then((r) => r && !r.ok && send("confirm", { from: "deck", on: false }))
+      .catch(() => {});
   }
   // Tap the preset: what it plays now, module by module; nothing to change here (E-024)
   function drawInfo() {

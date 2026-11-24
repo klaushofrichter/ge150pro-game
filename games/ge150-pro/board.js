@@ -220,8 +220,14 @@ export function mount(root, ctx) {
     return !!modules && !!base && (expChanged() || kept().some((m, s) => !sameModule(m, base.modules[s])));
   };
   /** The preset as Save keeps it (storeCurrent sends it, the pedal's acknowledgement takes it as stored): the live
-   * modules without the pedal's position, the live EXP target and volume range, the preset's own toe-switch mode (E-027). */
-  const asStored = (p) => ({ ...p, modules: structuredClone(kept()), exp: { ...p.exp, ...(exp ?? {}), FUN_SWITCH: p.exp.FUN_SWITCH } });
+   * modules without the pedal's position, the live EXP target (E-027), the preset's own toe-switch mode and volume range.
+   * The board cannot change the volume range (it never sends B3), and after a selection from the host the pedal keeps
+   * the previous preset's (E-030): the live one would carry it into this slot (E-034). */
+  const asStored = (p) => ({
+    ...p,
+    modules: structuredClone(kept()),
+    exp: { ...p.exp, ...(exp?.MODULE_CTRL !== undefined ? { MODULE_CTRL: exp.MODULE_CTRL, PARA_CTRL: exp.PARA_CTRL } : {}) },
+  });
   /** What the host's EXP assignment (98) sets: target and toe-switch mode. */
   const EXP_KEYS = ["MODULE_CTRL", "PARA_CTRL", "FUN_SWITCH"];
   const pickExp = (x) => Object.fromEntries(EXP_KEYS.map((k) => [k, x[k]]));
@@ -518,7 +524,7 @@ export function mount(root, ctx) {
     for (const c of view.commands) {
       if (c.n <= lastDone) continue;
       lastDone = c.n;
-      later(() => (c.kind === "select" ? select(c.index) : c.kind === "save" ? storeCurrent() : applyConfig(c.config, false)));
+      later(() => (c.kind === "select" ? select(c.index) : c.kind === "save" ? savePhoneAsked(c.index) : applyConfig(c.config, false)));
     }
     later(() => {
       if (lastDone === lastAcked) return;
@@ -530,6 +536,16 @@ export function mount(root, ctx) {
   /** Pedal work runs one job at a time; a failed job (the pedal unplugged mid-way) does not stop the ones after it. */
   function later(job) {
     busy = busy.then(job).catch(() => {});
+  }
+
+  /** The phone's "Save and switch": stores only the preset it asked about (`index`; none in logs from before: the
+   * current one), never one the pedal switched to meanwhile (E-034). */
+  async function savePhoneAsked(index) {
+    if (index !== undefined && index !== current) {
+      notice(`not saved: the phone asked about ${lib.presetLabel(index)}, the pedal plays ${lib.presetLabel(current)}`);
+      return;
+    }
+    await storeCurrent();
   }
 
   async function select(index) {
@@ -809,13 +825,20 @@ export function mount(root, ctx) {
    * A switch to another preset asked for on the board (`go` carries it out). With the setting on and unsaved changes,
    * the board asks first whether to save them; the phone cannot switch while it asks (E-021).
    */
-  function switchFromBoard(target, go) {
-    if (!canSwitch()) return;
+  async function switchFromBoard(target, go) {
+    if (!canSwitch() || asking) return;
     if (!prefsOf(info).confirm || !modifiedNow()) return later(go);
     const from = lib.presetLabel(current), to = target ? lib.presetLabel(target) : from;
     const name = stored.get(current)?.name?.trim() || from;
+    // the question opens only once the rules took it: the phone may be asking already (E-034; the platform shows
+    // the rules' reason). `asking` first, so a second tap meanwhile asks nothing.
     asking = true;
-    ctx.act(playerSeat(), "confirm", { from: "board", on: true });
+    const r = await Promise.resolve(ctx.act(playerSeat(), "confirm", { from: "board", on: true })).catch(() => null);
+    if (!asking) return; // closed meanwhile (the pedal switched by itself)
+    if (!r?.ok) {
+      asking = false;
+      return;
+    }
     ask(
       `Save the changes to ${from}?`,
       `"${name}" has unsaved changes. ${to === from ? `Selecting ${to} again reloads it and` : `Switching to ${to}`} discards them, unless you save them to ${from} first.`,
