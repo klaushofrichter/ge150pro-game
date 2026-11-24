@@ -239,3 +239,44 @@ Records are history: an older record is not edited when a newer one changes it. 
   volume and the confirm switch before the game is on the table. The file-level `live` goes. A table with a
   games-service from before D-326 shows no *Connect the pedal again* button. Check: `scripts/e2e/ge150_pro.py` (the
   settings window during the game).
+- **E-033 · 2026-11-24 · Klaus** — **A third simplify pass** ("run a /simplify and /code-review over all *-games
+  repositories"). Nothing the pedal receives changes, nor when: the same commands in the same order, and Save preset…
+  (`C3`) still asks first. Done: the library's EXP assignment (`98`) packs its numbers with `packU16` (the same
+  bytes, pinned by `tests/protocol.test.ts`). The board's questions come from one `ask(title, text, buttons)`, Save
+  preset… and "Save the changes first?" included; on the phone the delete and switch questions share one window
+  and a `question()` helper (the preset and configuration windows keep their own). One `asStored` gives the preset
+  as Save keeps it, for the store and for the pedal's acknowledgement (one `stored` listener); one `setExp` sends and
+  shows an EXP target, for the EXP toggle and after a selection. The board draws at most once per frame (a read of
+  the pedal reported a redraw per module), at once after a touch; the configuration list's wide bar is set up only
+  when the list changed (the kit measures by itself since games-service D-327). Going back to fullscreen after the
+  device chooser keeps one set of touch listeners, gives up after three tries and ends with the board. Names, the
+  playing preset and unsaved changes are worked out in one place for the bar, the A–D buttons and the banks window;
+  Reload saved and Reset share `reloadCurrent()`. The phone's favorites list is measured only when it or what stands
+  above it changes, or the screen; its long-press and card-drag listeners go with each gesture; it uses the
+  library's label and preset count once loaded. The question left open by a reload is closed once, not with every
+  update, on both screens. *Left out on purpose:* one shared module for the wording both screens use ("Save the
+  changes to …?", "Selects … first.", the tag filter): the texts already differ between board and phone, and a third
+  asset would need its own versioned load (E-030) with fallbacks before it arrives, for three sentences; the library
+  is the protocol, not the game's words. `expChanged` compares the target only, not the toe-switch mode (a mode is
+  playing, E-027), so it does not use the three-key `pickExp`. Out of scope as behaviour or platform changes: chain
+  values reported from what Save keeps, the race between taking a preset from its stored copy and a live read, the
+  wait for the save's acknowledgement in the library, asset versioning, fullscreen after the chooser by the platform,
+  room for the scrollbar, the north bar's coordinates. *Why:* less code to read and keep in step, fewer redraws and
+  listeners. Check: `npm test`, `npm run typecheck`, the three browser checks.
+- **E-034 · 2026-11-24 · Klaus** — **The code review that followed E-033.** No new pedal commands: the fixes change
+  only what goes into a `C3` write, or whether one is sent at all. (1) **Save preset… keeps the preset's own volume
+  range.** After a selection from the host the pedal keeps the previous preset's EXP target and volume range (E-030);
+  the board puts back the target (`98`) but cannot set the range (it never sends `B3`), and Save took the whole live
+  EXP setting, so it wrote the previous preset's range into the new slot. The board has no control for the range, so
+  Save now takes only the target (`MODULE_CTRL`, `PARA_CTRL`) from the live setting and keeps the preset's own toe-switch
+  mode and range. (2) **The phone's "Save and switch" saves only the preset it asked about.** The answer carries
+  `saveIndex` and the queued save its `index`; the rules refuse an answer about a preset that no longer plays, and the
+  board skips (with a notice) a queued save whose preset is not the one playing. An answer or save without the index
+  (logs from before) means the current preset, as before. (3) **One question at a time.** The board and the phone open
+  "Save the changes first?" only once the rules took their `confirm`; refused (the other screen asks), nothing opens
+  and the platform shows the reason. (4) **Load all from file… cannot wipe the configurations by accident:** a
+  replacement without a list is refused, and one of none says "The file holds no configurations". (5) `protocol.md`
+  says the game sends `98` (EXP toggle, and after a selection from the host) and never `B3`. *Check:* `npm test`
+  (the answer for another preset refused without a change, the save carrying its index, the empty and missing
+  lists), `npm run typecheck`, the three browser checks; `scripts/e2e/ge150_pro_flows.py` saves 14C after selecting it
+  from the banks and checks its own range (20–80 in the simulated pedal) in the `C3`.

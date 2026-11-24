@@ -30,8 +30,8 @@
   const presets = Array.from({ length: 200 }, (_, i) => ({
     name: `Preset ${i + 1}`.padEnd(16, "\0").slice(0, 16),
     modules: Array.from({ length: 9 }, (_, s) => ({ on: (s + i) % 2 === 0, type: s % 3, values: [50, 50, 50, 0, 0, 0, 0, 0, 0, 0] })),
-    // bank 14 (53-56): another EXP target, in volume mode
-    exp: i >= 52 && i < 56 ? [2, 13, 0, 1, 0, 100] : [8, 57, 1, 1, 0, 100],
+    // bank 14 (53-56): another EXP target, in volume mode, and another volume range (20-80)
+    exp: i >= 52 && i < 56 ? [2, 13, 0, 1, 20, 80] : [8, 57, 1, 1, 0, 100],
   }));
   const LOAD_MS = 120;
   let loading;

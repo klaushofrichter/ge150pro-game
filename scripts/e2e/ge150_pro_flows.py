@@ -1,6 +1,7 @@
 """Browser check for the GE150 Pro flows beyond the first session (scripts/e2e/ge150_pro.py covers that), on a real
 games-service Table Host with the simulated pedal (fake_pedal.js):
   - Save preset… asks first; Cancel sends nothing; Save writes the preset slot (C3) and the unsaved mark goes away;
+    a preset selected from the board is stored with its own volume range, not the one the pedal kept (E-034);
   - choosing another model in the model window changes the module's model on the pedal;
   - with the board closed, a phone command waits; a new board carries it out once, and a reload does not repeat it;
   - configurations kept on the phone come back in the next game;
@@ -111,6 +112,18 @@ def main():
             wait(lambda: board.evaluate("() => window.__pedal.state.exp.slice(0, 3).join()") == "2,13,0", 5, "14C's own EXP target")
             time.sleep(0.5)
             assert not board.locator(".gp-name").inner_text().endswith("*"), board.locator(".gp-name").inner_text()
+            # E-034: the pedal kept 2A's volume range too (the game never sends B3); Save preset… on 14C stores 14C's own
+            assert board.evaluate("() => window.__pedal.state.exp.slice(3).join()") == "1,0,100", "the pedal keeps the old range"
+            stores = sent(board, 0xC3)
+            board.locator(".gp-power[data-power='1']").click()
+            wait(lambda: board.locator(".gp-name").inner_text().endswith("*"), 5, "the unsaved mark on 14C")
+            board.locator(".gp-save").click()
+            board.locator(".gp-sheet .gp-yes").click()
+            wait(lambda: sent(board, 0xC3) == stores + 1, 5, "the pedal to receive the store of 14C")
+            vol = board.evaluate("() => { const m = window.__pedal.log.filter((x) => x.cmd === 0xc3).at(-1).payload; "
+                                 "return [m[0], ...[3, 4, 5].map((k) => m[17 + 216 + 2 * k] | (m[18 + 216 + 2 * k] << 8))]; }")
+            assert vol == [55, 1, 20, 80], f"14C keeps its own volume range: {vol}"
+            wait(lambda: not board.locator(".gp-name").inner_text().endswith("*"), 5, "the unsaved mark to go")
             # an unsaved change: * in the banks; Reload saved asks, then drops it
             board.locator(".gp-power[data-power='1']").click()
             wait(lambda: board.locator(".gp-name").inner_text().endswith("*"), 5, "the unsaved mark")

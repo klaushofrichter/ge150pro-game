@@ -22,6 +22,11 @@ function writeU16(b, off, v) {
   b[off] = v & 255;
   b[off + 1] = v >> 8 & 255;
 }
+function packU16(...values) {
+  const b = new Uint8Array(values.length * 2);
+  values.forEach((v, i) => writeU16(b, i * 2, v));
+  return b;
+}
 function encodeMessage(cmd, payload = new Uint8Array()) {
   const len = payload.length + 1;
   const m = new Uint8Array(len + 6);
@@ -311,9 +316,7 @@ function expParamId(slot, paramName) {
   return EXP_PARAMS[slot]?.find((p) => p.name === name)?.id;
 }
 function setExpFunction(e) {
-  const b = new Uint8Array(6);
-  [e.MODULE_CTRL, e.PARA_CTRL, e.FUN_SWITCH].forEach((v, i) => (b[2 * i] = v & 255, b[2 * i + 1] = v >> 8 & 255));
-  return encodeMessage(ExpCmd.SET_FUNCTION, b);
+  return encodeMessage(ExpCmd.SET_FUNCTION, packU16(e.MODULE_CTRL, e.PARA_CTRL, e.FUN_SWITCH));
 }
 function expTarget(e, type) {
   const name = EXP_PARAMS[e.MODULE_CTRL]?.find((p) => p.id === e.PARA_CTRL)?.name;

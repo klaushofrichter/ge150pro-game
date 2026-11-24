@@ -109,8 +109,38 @@ describe("GE150 Pro", () => {
     const configs = (rt.boardView() as any).configs;
     expect(configs.map((c: any) => [c.id, c.slot, c.trigger])).toEqual([["a", null, 5], ["b", 2, null]]);
     expect(rt.submit(0, { name: "configs", payload: { list: [{ id: "x" }], replace: true } }, "board")).toEqual({ ok: false, reason: "The file holds no configurations this game can use" });
-    expect(rt.submit(0, { name: "configs", payload: { list: [], replace: true } }, "board")).toEqual({ ok: true });
-    expect((rt.boardView() as any).configs).toEqual([]);
+    // a file of none, or no list at all, would wipe every configuration kept: refused, nothing changes (E-034)
+    const before = JSON.stringify(rt.state);
+    expect(rt.submit(0, { name: "configs", payload: { list: [], replace: true } }, "board")).toEqual({ ok: false, reason: "The file holds no configurations" });
+    for (const payload of [{ replace: true }, { list: "a", replace: true }, { list: null, replace: true }]) {
+      expect(rt.submit(0, { name: "configs", payload }, "board"), JSON.stringify(payload)).toEqual({ ok: false, reason: "That is not a list of configurations" });
+    }
+    expect(JSON.stringify(rt.state)).toBe(before);
+    expect((rt.boardView() as any).configs.map((c: any) => c.id)).toEqual(["a", "b"]);
+  });
+
+  it("saves only the preset the phone asked about, and says which in the queued save (E-034)", () => {
+    const { rt } = connected();
+    const v = () => rt.boardView() as any;
+    rt.submit(0, { name: "capture", payload: { config: config("a", { preset: 9 }) } }, "board");
+    // the phone asked about 2A (5); the pedal switched to 2B meanwhile: "Save and switch" is refused and changes nothing
+    expect(rt.submit(0, { name: "confirm", payload: { from: "deck", on: true } }, "human")).toEqual({ ok: true });
+    rt.submit(0, { name: "pedal", payload: { current: 6 } }, "board");
+    const before = JSON.stringify(rt.state);
+    for (const intent of [{ name: "select", payload: { step: 1, save: true, saveIndex: 5 } }, { name: "apply", payload: { id: "a", save: true, saveIndex: 5 } }]) {
+      expect(rt.submit(0, intent, "human")).toEqual({ ok: false, reason: "The question was about another preset: the pedal has switched" });
+    }
+    expect(rt.submit(0, { name: "select", payload: { step: 1, save: true, saveIndex: "6" } }, "human")).toMatchObject({ ok: false });
+    expect(JSON.stringify(rt.state)).toBe(before);
+    expect(v().commands).toEqual([]);
+    // about the preset that plays: the board gets a save naming it, then the switch
+    expect(rt.submit(0, { name: "select", payload: { step: 1, save: true, saveIndex: 6 } }, "human")).toEqual({ ok: true });
+    expect(v().commands.map(({ n, ...c }: any) => c)).toEqual([{ kind: "save", index: 6 }, { kind: "select", index: 7 }]);
+    expect(v().confirming).toBe(null);
+    // an answer from before the index (old logs replay): about the current preset, as then
+    expect(rt.submit(0, { name: "select", payload: { step: 1, save: true } }, "human")).toEqual({ ok: true });
+    expect(v().commands.at(-2)).toMatchObject({ kind: "save" });
+    expect(v().commands.at(-2)).not.toHaveProperty("index");
   });
 
   it("keeps the modules' values the board reports with the chain, and drops malformed ones (E-024)", () => {
